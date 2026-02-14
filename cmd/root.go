@@ -61,6 +61,7 @@ func init() {
 	rootCmd.AddCommand(ssoCmd)
 	rootCmd.AddCommand(secretsCmd)
 	rootCmd.AddCommand(moduleCmd)
+	rootCmd.AddCommand(versionCmd)
 
 	// Add completion command
 	rootCmd.AddCommand(completionCmd)
