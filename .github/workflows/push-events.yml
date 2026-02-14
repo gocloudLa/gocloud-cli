@@ -13,9 +13,48 @@ jobs:
   release:
     name: Release Please
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release-please.outputs.release_created }}
+      tag_name: ${{ steps.release-please.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release-please
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: go
           target-branch: main
+
+  build-and-publish:
+    name: Build and Publish
+    needs: release
+    if: needs.release.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code at release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag_name }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: make test
+
+      - name: Build release artifacts
+        run: make release
+
+      - name: Rename artifacts with version
+        run: |
+          VERSION="${{ needs.release.outputs.tag_name }}"
+          cd dist
+          for base in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64.exe; do
+            [ -f "gocloud-${base}" ] && mv "gocloud-${base}" "gocloud-${VERSION}-${base}"
+          done
+
+      - name: Upload artifacts to GitHub Release
+        run: gh release upload ${{ needs.release.outputs.tag_name }} dist/* --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
