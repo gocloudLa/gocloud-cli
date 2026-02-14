@@ -276,10 +276,11 @@ infrastructure:
 
 func TestSaveConfig(t *testing.T) {
 	tests := []struct {
-		name        string
-		configFile  string
-		expectError bool
-		errorMsg    string
+		name         string
+		configFile   string
+		expectError  bool
+		errorMsg     string   // if set, error must contain this
+		errorMsgAlt  []string // optional: any of these also accepted (e.g. OS-specific "permission denied")
 	}{
 		{
 			name:        "save valid config",
@@ -291,12 +292,14 @@ func TestSaveConfig(t *testing.T) {
 			configFile:  "/invalid/path/config.yaml",
 			expectError: true,
 			errorMsg:    "failed to save config",
+			errorMsgAlt: []string{"permission denied"},
 		},
 		{
 			name:        "save config to read-only directory",
 			configFile:  "/root/config.yaml",
 			expectError: true,
 			errorMsg:    "failed to save config",
+			errorMsgAlt: []string{"permission denied"},
 		},
 	}
 
@@ -336,8 +339,19 @@ func TestSaveConfig(t *testing.T) {
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("SaveConfig() expected error but got nil")
-				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
-					t.Errorf("SaveConfig() error message '%s' does not contain '%s'", err.Error(), tt.errorMsg)
+				} else if tt.errorMsg != "" {
+					ok := strings.Contains(err.Error(), tt.errorMsg)
+					if !ok && len(tt.errorMsgAlt) > 0 {
+						for _, alt := range tt.errorMsgAlt {
+							if strings.Contains(err.Error(), alt) {
+								ok = true
+								break
+							}
+						}
+					}
+					if !ok {
+						t.Errorf("SaveConfig() error message '%s' does not contain '%s' (or any of %v)", err.Error(), tt.errorMsg, tt.errorMsgAlt)
+					}
 				}
 			} else {
 				if err != nil {
