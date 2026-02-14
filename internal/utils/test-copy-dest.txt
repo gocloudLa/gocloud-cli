@@ -1,0 +1,3 @@
+Source file content
+with multiple lines
+and unicode: 世界 🌍
