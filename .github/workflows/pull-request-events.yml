@@ -1,4 +1,4 @@
-name: Pull Request Events
+name: pull-request-events
 
 on:
   pull_request:
@@ -35,7 +35,7 @@ jobs:
           requireScope: false
 
   go-validation:
-    name: Go test and build
+    name: Go Validation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -64,3 +64,10 @@ jobs:
 
       - name: Build (current platform)
         run: make build-current
+
+  workflow-summary:
+    name: workflow-summary
+    runs-on: ubuntu-latest
+    needs: [check-pr-title, go-validation]
+    steps:
+      - run: echo "All checks passed"
