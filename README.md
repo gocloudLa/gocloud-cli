@@ -61,7 +61,31 @@ gocloud secrets init --all
 
 ## Comandos Principales
 
-Para ver la versión del CLI use `gocloud --version`.
+Para ver la versión del CLI use `gocloud --version` o `gocloud version`.
+
+### Versión y actualización
+
+#### `gocloud version [--check] [--update]`
+Muestra la versión actual del CLI.
+
+**Opciones**:
+- Sin flags: muestra la versión actual (build time y commit).
+- `--check`: consulta [GitHub Releases](https://github.com/gocloudLa/gocloud-cli/releases) y compara con la última versión. Si hay una versión más nueva, imprime los comandos para actualizar manualmente (curl, chmod, mv).
+- `--update`: si hay actualización disponible, intenta descargar y reemplazar el binario automáticamente (solo Unix; en Windows se muestran solo los comandos manuales).
+
+**Ejemplos**:
+```bash
+gocloud version
+gocloud version --check
+gocloud version --check --update
+```
+
+Si hay una versión nueva y no usás `--update`, la salida incluirá los comandos exactos para tu plataforma, por ejemplo:
+```bash
+curl -sL -o gocloud "https://github.com/gocloudLa/gocloud-cli/releases/download/v1.1.0/gocloud-v1.1.0-darwin-arm64"
+chmod +x gocloud
+sudo mv gocloud /usr/local/bin/
+```
 
 ### Configuración
 
