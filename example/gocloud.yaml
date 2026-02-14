@@ -1,0 +1,213 @@
+cli:
+  working_dir: "."
+  auto_backup: true
+  backup_dir: ".gocloud-backups"
+  verbose: false
+  debug: false
+
+infrastructure:
+  client: test-client
+  company: gcl
+  region: us-east-1
+  version: 0.17.0
+  # Optional: Use custom Git source instead of registry
+  # source: "git@github.com:gocloudLa/terraform-aws-standard-platform.git"
+  # source_ref: "main"  # branch, tag, or commit hash
+  enable_secrets: true  # Global secrets setting (default: true)
+  enable_terragrunt: true  # Global terragrunt setting (default: true)
+  # Secrets backend configuration (optional, default backend: "ssm")
+  # secrets:
+  #   type: "ssm"  # or "sops"
+  # Optional: organization layer overrides (secrets, providers, backend, SSO for gocloud sso login/setup)
+  # organization:
+  #   secrets:
+  #     type: "sops"
+  #   providers:   # Use these default_providers for organization/providers.tf (e.g. assume_role cross-account)
+  #     default_providers:
+  #       - name: "aws"
+  #         region: "local.metadata.aws_region"
+  #         alias: "sha"
+  #         assume_role:
+  #           role_arn: "arn:aws:iam::904233109008:role/OrganizationAccountAccessRole"
+  #           session_name: "TerraformSession"
+  #   backend:     # Optional: override backend only for organization/backend.tf (pattern, region, encrypt, etc.)
+  #     pattern: "org-backend"
+  #     region: "us-east-1"
+  #     encrypt: true
+  #   aws_account: "112345678900"   # Required for SSO: creates profile {client}-org so sso login --all includes it
+  #   aws_sso:                      # Optional: override SSO for org profile
+  #     start_url: "https://..."
+  #     role_name: "Admin"
+  layers:  # Global layer settings (default: all true)
+    base: true
+    foundation: true
+    organization: true
+
+  # Default backend settings (commented - uncomment to customize):
+  # backend:
+  #   pattern: "s3-backend"
+  #   region: "us-east-1"
+  #   account: "sha"
+  #   encrypt: true
+  #   type: "s3"  # Default: "s3"
+  #   use_profile: true  # Default: true
+  #   # bucket_name: "my-custom-terraform-state-bucket"  # Default: {company}-{account}-{pattern}
+  #   # dynamodb_table_name: "my-custom-terraform-locks" # Default: {company}-{account}-{pattern}
+  
+  # Default providers (commented - uncomment to customize):
+  # providers:
+  #   default_providers:
+  #     - name: "aws"
+  #       region: "local.metadata.aws_region"
+  #     - name: "aws"
+  #       region: "us-east-1"
+  #       alias: "use1"
+  #   # Optional: assume_role for a provider (e.g. cross-account)
+  #   #   - name: "aws"
+  #   #     region: "local.metadata.aws_region"
+  #   #     alias: "sha"
+  #   #     assume_role:
+  #   #       role_arn: "arn:aws:iam::904233109008:role/OrganizationAccountAccessRole"
+  #   #       session_name: "TerraformSession"
+  #   use_profiles: true  # Control AWS profiles (default: true)
+
+  
+  aws_sso:
+    region: "us-east-1"
+    start_url: "https://gocloud-la.awsapps.com/start#/"
+    role_name: "Admin"
+  
+  environments:
+    sha:
+      name: "Shared"
+      dir_name: "shared"
+      aws_account: "112345678901"
+      version: 0.2.0
+      # Example: environment-level secrets backend override (inherits global if omitted)
+      # secrets:
+      #   type: "ssm"  # or "sops"
+      aws_sso:
+        start_url: "https://democorp.awsapps.com/start#/"
+        role_name: "Admin"
+      projects:
+        - common
+        - core
+      workloads:
+        - authentication
+        - language-redirect
+    
+    stg:
+      aws_account: "112345678902"
+      region: "eu-west-1"    # Different region for staging
+      # Example: Use Git source for testing feature branches
+      # source: "git@github.com:gocloudLa/terraform-aws-standard-platform.git"
+      # source_ref: "feature/new-feature"  # Test specific feature branch
+      enable_secrets: false     # Disable secrets for staging environment
+      enable_terragrunt: false  # Disable terragrunt for staging environment
+      enable_sso: false         # Disable SSO for staging environment
+      layers:                   # Override layer settings for staging (base and foundation only)
+        base: false             # No base layer in staging
+        foundation: true        # Keep foundation
+        # organization is global only, cannot be configured per environment
+      projects:
+        - core
+        - common
+        # Example: Project with custom name (staging environment)
+        - blck:                     # Key: "blck"
+            name: "Blockchain"      # metadata.tf: project = "Blockchain"
+            enable_terragrunt: true # Enable terragrunt for this project
+        # Example: Project with terragrunt disabled
+        - legacy:                   # Key: "legacy"
+            name: "Legacy System"   # metadata.tf: project = "Legacy System"
+      workloads:
+        - webapp
+        - api
+        # Example: Workload with custom name and dependencies
+        - blck:                     # Key: "blck"
+            name: "Blockchain"      # metadata.tf: project = "Blockchain"
+            enable_terragrunt: true # Enable terragrunt for this workload
+    
+    prd:
+      name: "Production"
+      dir_name: "production"
+      aws_account: "112345678903"
+      # Example: environment-level secrets backend override (uncomment to use SOPS for all layers in prd)
+      # secrets:
+      #   type: "sops"
+      aws_sso:
+        role_name: "Admin"
+      # Example: Environment-level backend and provider overrides
+      backend:
+        type: "s3"
+        key_template: "{{.Company}}/{{.Environment}}/{{.Layer}}/terraform.tfstate"
+        use_profile: false  # Disable profiles for this environment
+      providers:
+        use_profiles: false  # Disable profiles for this environment
+        default_providers:
+          - name: "aws"
+            region: "us-west-2"  # Override region for this environment
+      projects:
+        - core
+        - common
+        # Example: Project with custom name and backend/provider overrides
+        - dept:                     # Key: "dept"
+            name: "Deposits"        # metadata.tf: project = "Deposits"
+            backend:
+              key_template: "{{.Company}}/deposits/{{.Environment}}/terraform.tfstate"
+            providers:
+              use_profiles: true    # Override environment setting
+              default_providers:
+                - name: "aws"
+                  region: "us-east-1"
+                  alias: "primary"
+        # Example: Project with custom directory name
+        - wdwl:                     # Key: "wdwl"
+            name: "Withdrawals"     # metadata.tf: project = "Withdrawals"
+            dir_name: "withdrawals" # Directory: "withdrawals"
+        # Example: Project with SOPS secrets backend
+        - example:                  # Key: "example"
+            name: "Example Project" # metadata.tf: project = "Example Project"
+            secrets:
+              type: "sops"         # Use SOPS backend for this project
+      workloads:
+        - webapp
+        - api
+        - blockchain-service:
+            depends_on: ["project/common", "project/core"]
+        - legacy-app:
+            enable_secrets: false  # Disable secrets for this specific workload
+        # Example: workload-level secrets backend override (uses SOPS only for this workload)
+        # - sops-app:
+        #     name: "SOPS App"
+        #     secrets:
+        #       type: "sops"
+        # Example: Workload with custom name and backend/provider overrides
+        - dept:                     # Key: "dept"
+            name: "Deposits"        # metadata.tf: project = "Deposits"
+            backend:
+              use_profile: true     # Override environment setting
+            providers:
+              use_profiles: true    # Override environment setting
+              default_providers:
+                - name: "aws"
+                  region: "eu-west-1"
+                  alias: "europe"
+        # Example: Workload with custom directory and disabled secrets
+        - wdwl:                     # Key: "wdwl"
+            name: "Withdrawals"     # metadata.tf: project = "Withdrawals"
+            dir_name: "withdrawals" # Directory: "withdrawals"
+            enable_secrets: false   # Disable secrets for this specific workload
+            backend:
+              type: "s3"
+              key_template: "{{.Company}}/withdrawals/{{.Environment}}/terraform.tfstate"
+            providers:
+              use_profiles: false   # Disable profiles for this workload
+              default_providers:
+                - name: "aws"
+                  region: "ap-southeast-1"
+                  alias: "asia"
+        # Example: Workload with terragrunt disabled but secrets enabled
+        - standalone:               # Key: "standalone"
+            name: "Standalone App"  # metadata.tf: project = "Standalone App"
+            enable_terragrunt: false  # Disable terragrunt for this workload
+

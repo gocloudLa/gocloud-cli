@@ -1,0 +1,76 @@
+# Standard Platform - Terraform Module 🚀🚀
+<p align="right"><a href="https://partners.amazonaws.com/partners/0018a00001hHve4AAC/GoCloud"><img src="https://img.shields.io/badge/AWS%20Partner-Advanced-orange?style=for-the-badge&logo=amazonaws&logoColor=white" alt="AWS Partner"/></a><a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-green?style=for-the-badge&logo=apache&logoColor=white" alt="LICENSE"/></a></p>
+
+Welcome to the Standard Platform — a suite of reusable and production-ready Terraform modules purpose-built for AWS environments.
+Each module encapsulates best practices, security configurations, and sensible defaults to simplify and standardize infrastructure provisioning across projects.
+
+## 📦 Module: {{.ModuleName}}
+{{if .ModuleBadges}}<p align="right">{{range .ModuleBadges}}<a href="{{.URL}}"><img src="{{.Image}}" alt="{{.Alt}}"/></a>{{end}}</p>{{end}}
+{{.ModuleDescription | raw}}
+
+### ✨ Features
+{{range .Features}}
+- {{.Icon}} [{{.Title}}](#{{.Title | anchorize}}) - {{.ShortDescription}}
+{{end}}
+
+{{if .ExternalModules}}
+### 🔗 External Modules
+| Name | Version |
+|------|------:|
+{{range .ExternalModules}}| <a href="{{.URL}}" target="_blank">{{.Name}}</a> | {{.Version}} |
+{{end}}
+{{end}}
+
+## 🚀 Quick Start
+{{.QuickStart | raw}}
+
+## 🔧 Additional Features Usage
+{{range .Features}}
+### {{.Title}}
+{{.LongDescription | raw}}
+{{range .Examples}}
+<details><summary>{{.Title}}</summary>
+
+{{.Code | raw}}
+
+</details>
+{{end}}
+{{end}}
+
+{{if .InputsTablePretty}}
+## 📑 Inputs
+{{.InputsTablePretty | raw}}
+{{end}}
+
+{{if .OutputsTable}}
+## 📤 Outputs
+{{.OutputsTable | raw}}
+{{end}}
+
+{{if .Examples}}
+## 📚 Examples
+{{.Examples | raw}}
+{{end}}
+
+{{if .ImportantNotes}}
+## ⚠️ Important Notes
+{{.ImportantNotes | raw}}
+{{end}}
+
+---
+
+## 🤝 Contributing
+We welcome contributions! Please see our contributing guidelines for more details.
+
+## 🆘 Support
+- 📧 **Email**: info@gocloud.la
+
+## 🧑‍💻 About
+We are focused on Cloud Engineering, DevOps, and Infrastructure as Code.
+We specialize in helping companies design, implement, and operate secure and scalable cloud-native platforms.
+- 🌎 [www.gocloud.la](https://www.gocloud.la)
+- ☁️ AWS Advanced Partner (Terraform, DevOps, GenAI)
+- 📫 Contact: info@gocloud.la
+
+## 📄 License
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details. 
