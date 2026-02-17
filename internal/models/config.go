@@ -208,7 +208,9 @@ func ValidateConfigWithUnknownFields(yamlData []byte) (*ValidationResult, error)
 				"aws_sso":           true,
 				"metadata":          true,
 				"environments":      true,
+				"environment_order": true,
 				"secrets":           true,
+				"organization":      true,
 			}
 
 			for field := range infraMap {

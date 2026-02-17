@@ -323,29 +323,120 @@ func TestValidateConfig(t *testing.T) {
 }
 
 func TestValidateConfigWithUnknownFields(t *testing.T) {
-	// This test would require a more complex setup to test unknown field detection
-	// For now, we'll test that the function doesn't crash with unknown fields
-	config := &Config{
-		CLI: DefaultCLIConfig(),
-		Infrastructure: &InfrastructureConfig{
-			Client:  "test-client",
-			Company: "gcl",
-			Region:  "us-east-1",
-			Version: "v1.0.0",
-			Environments: map[string]Environment{
-				"dev": {
-					Name:       "Development",
-					DirName:    "dev",
-					AWSAccount: "123456789012",
-				},
-			},
-		},
-	}
+	t.Run("valid config with organization passes strict validation", func(t *testing.T) {
+		// infrastructure.organization is a known field; must not produce "Unknown infrastructure field" warning
+		yamlData := []byte(`
+cli: {}
+infrastructure:
+  client: test-client
+  company: gcl
+  region: us-east-1
+  environments:
+    dev:
+      name: Development
+      dir_name: dev
+      aws_account: "123456789012"
+  organization:
+    aws_account: "123456789012"
+`)
+		result, err := ValidateConfigWithUnknownFields(yamlData)
+		if err != nil {
+			t.Fatalf("ValidateConfigWithUnknownFields() err = %v", err)
+		}
+		for _, w := range result.Warnings {
+			if w == "Unknown infrastructure field: 'infrastructure.organization'" {
+				t.Errorf("infrastructure.organization is a known field; got unwanted warning: %s", w)
+			}
+		}
+		if !result.Valid {
+			t.Errorf("expected valid config; got Errors: %v", result.Errors)
+		}
+	})
 
-	err := ValidateConfig(config)
-	if err != nil {
-		t.Errorf("ValidateConfig() with valid config should not error, got: %v", err)
-	}
+	t.Run("unknown infrastructure field produces warning", func(t *testing.T) {
+		yamlData := []byte(`
+cli: {}
+infrastructure:
+  client: test-client
+  company: gcl
+  region: us-east-1
+  environments:
+    dev:
+      name: Development
+      dir_name: dev
+      aws_account: "123456789012"
+  foo_bar_unknown: something
+`)
+		result, err := ValidateConfigWithUnknownFields(yamlData)
+		if err != nil {
+			t.Fatalf("ValidateConfigWithUnknownFields() err = %v", err)
+		}
+		var found bool
+		for _, w := range result.Warnings {
+			if w == "Unknown infrastructure field: 'infrastructure.foo_bar_unknown'" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected warning for unknown field infrastructure.foo_bar_unknown; got Warnings: %v", result.Warnings)
+		}
+	})
+
+	t.Run("unknown top-level field produces warning", func(t *testing.T) {
+		yamlData := []byte(`
+cli: {}
+infrastructure:
+  client: test-client
+  company: gcl
+  region: us-east-1
+  environments:
+    dev:
+      name: Development
+      dir_name: dev
+      aws_account: "123456789012"
+unknown_top: value
+`)
+		result, err := ValidateConfigWithUnknownFields(yamlData)
+		if err != nil {
+			t.Fatalf("ValidateConfigWithUnknownFields() err = %v", err)
+		}
+		var found bool
+		for _, w := range result.Warnings {
+			if w == "Unknown top-level field: 'unknown_top'" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected warning for unknown top-level field; got Warnings: %v", result.Warnings)
+		}
+	})
+
+	t.Run("valid minimal config has no warnings", func(t *testing.T) {
+		yamlData := []byte(`
+cli: {}
+infrastructure:
+  client: test-client
+  company: gcl
+  region: us-east-1
+  environments:
+    dev:
+      name: Development
+      dir_name: dev
+      aws_account: "123456789012"
+`)
+		result, err := ValidateConfigWithUnknownFields(yamlData)
+		if err != nil {
+			t.Fatalf("ValidateConfigWithUnknownFields() err = %v", err)
+		}
+		if len(result.Warnings) != 0 {
+			t.Errorf("valid minimal config should have no warnings; got: %v", result.Warnings)
+		}
+		if !result.Valid {
+			t.Errorf("expected valid; got Errors: %v", result.Errors)
+		}
+	})
 }
 
 func TestValidateEnvironment(t *testing.T) {
