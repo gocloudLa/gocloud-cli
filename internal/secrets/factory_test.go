@@ -45,9 +45,9 @@ func TestResolveSecretsConfig_InvalidLayerPath(t *testing.T) {
 	tests := []struct {
 		layerPath string
 	}{
-		{"base"},           // 1 part
-		{"a/b/c/d"},        // 4 parts
-		{"base"},           // 1 part
+		{"base"},    // 1 part
+		{"a/b/c/d"}, // 4 parts
+		{"base"},    // 1 part
 		{"onlyone"},
 		{"one/two/three/four"},
 	}

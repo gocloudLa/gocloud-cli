@@ -21,11 +21,11 @@ type LayerConfig struct {
 // Use this when the organization layer needs a different secrets (or other) config than the global default.
 // AWSAccount is required for SSO setup/login: when set, gocloud sso setup generates a profile {client}-org.
 type OrganizationLayerConfig struct {
-	Secrets    *SecretsConfig              `json:"secrets" yaml:"secrets,omitempty"`
-	Providers  *ProviderConfig             `json:"providers" yaml:"providers,omitempty"`   // default_providers (e.g. with assume_role) for organization/providers.tf
-	Backend    *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`     // optional backend override for organization/backend.tf
-	AWSAccount string                      `json:"aws_account" yaml:"aws_account,omitempty"` // AWS account ID for organization (SSO profile client-org)
-	AWSSSO     *SSOConfig                  `json:"aws_sso" yaml:"aws_sso,omitempty"`         // Optional SSO overrides for organization profile
+	Secrets    *SecretsConfig               `json:"secrets" yaml:"secrets,omitempty"`
+	Providers  *ProviderConfig              `json:"providers" yaml:"providers,omitempty"`     // default_providers (e.g. with assume_role) for organization/providers.tf
+	Backend    *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`         // optional backend override for organization/backend.tf
+	AWSAccount string                       `json:"aws_account" yaml:"aws_account,omitempty"` // AWS account ID for organization (SSO profile client-org)
+	AWSSSO     *SSOConfig                   `json:"aws_sso" yaml:"aws_sso,omitempty"`         // Optional SSO overrides for organization profile
 }
 
 // SecretsConfig represents the secrets backend configuration
@@ -775,7 +775,7 @@ type ProviderAssumeRole struct {
 // values in Extra should be valid HCL right-hand side (e.g. "value" for strings, true/false, numbers).
 type ProviderSpec struct {
 	Name       string              `json:"name" yaml:"name"`             // "aws", "gitlab", etc.
-	Region     string              `json:"region" yaml:"region"`          // AWS: "us-east-1" or "local.metadata.aws_region"
+	Region     string              `json:"region" yaml:"region"`         // AWS: "us-east-1" or "local.metadata.aws_region"
 	Alias      string              `json:"alias" yaml:"alias,omitempty"` // "use1"
 	Profile    string              `json:"profile" yaml:"profile,omitempty"`
 	AssumeRole *ProviderAssumeRole `json:"assume_role" yaml:"assume_role,omitempty"`

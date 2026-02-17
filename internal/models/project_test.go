@@ -780,7 +780,7 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 				Projects: []interface{}{
 					"core",
 					ProjectItem{
-						Key: "dept",
+						Key:  "dept",
 						Name: "Deposits",
 						Backend: &BackendInfrastructureConfig{
 							KeyTemplate: "{{.Company}}/deposits/{{.Environment}}/terraform.tfstate",
@@ -790,14 +790,14 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 				Workloads: []interface{}{
 					"webapp",
 					WorkloadItem{
-						Key: "dept",
+						Key:  "dept",
 						Name: "Deposits",
 						Backend: &BackendInfrastructureConfig{
 							UseProfile: &useProfileTrue,
 						},
 					},
 					WorkloadItem{
-						Key: "wdwl",
+						Key:  "wdwl",
 						Name: "Withdrawals",
 						Backend: &BackendInfrastructureConfig{
 							Type:        "s3",
@@ -913,7 +913,7 @@ func TestResolveProviderConfigWithProjectWorkloadOverrides(t *testing.T) {
 				Projects: []interface{}{
 					"core",
 					ProjectItem{
-						Key: "dept",
+						Key:  "dept",
 						Name: "Deposits",
 						Providers: &ProviderConfig{
 							UseProfiles: &useProfilesTrue,
@@ -926,7 +926,7 @@ func TestResolveProviderConfigWithProjectWorkloadOverrides(t *testing.T) {
 				Workloads: []interface{}{
 					"webapp",
 					WorkloadItem{
-						Key: "dept",
+						Key:  "dept",
 						Name: "Deposits",
 						Providers: &ProviderConfig{
 							UseProfiles: &useProfilesTrue,
@@ -941,13 +941,13 @@ func TestResolveProviderConfigWithProjectWorkloadOverrides(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		layerType    string
-		projectKey   string
-		envKey       string
-		wantRegion   string
-		wantAlias    string
-		wantUseProf  *bool
+		name        string
+		layerType   string
+		projectKey  string
+		envKey      string
+		wantRegion  string
+		wantAlias   string
+		wantUseProf *bool
 	}{
 		{
 			name:        "project with provider override (use_profiles, default_providers)",

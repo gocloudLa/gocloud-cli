@@ -1224,7 +1224,7 @@ func TestGenerateOrganizationSecrets_ContentSSMWhenOrganizationSecretsNotSet(t *
 		Region:        "us-east-1",
 		EnableSecrets: ptrBool(true),
 		Secrets:       &models.SecretsConfig{Type: "ssm"},
-		Organization: &models.OrganizationLayerConfig{AWSAccount: "112345678900"},
+		Organization:  &models.OrganizationLayerConfig{AWSAccount: "112345678900"},
 		Layers: &models.LayerConfig{
 			Base:         ptrBool(false),
 			Foundation:   ptrBool(false),
@@ -1258,7 +1258,7 @@ func TestGenerateOrganizationSecrets_NotGeneratedWhenSecretsDisabled(t *testing.
 		Company:       "gcl",
 		Region:        "us-east-1",
 		EnableSecrets: ptrBool(false),
-		Organization: &models.OrganizationLayerConfig{AWSAccount: "112345678900"},
+		Organization:  &models.OrganizationLayerConfig{AWSAccount: "112345678900"},
 		Layers: &models.LayerConfig{
 			Base:         ptrBool(false),
 			Foundation:   ptrBool(false),

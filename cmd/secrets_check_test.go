@@ -138,7 +138,7 @@ func TestParseLayerPathComponents_Organization(t *testing.T) {
 
 func TestShouldGenerateSecretsForPath_Organization(t *testing.T) {
 	infra := &models.InfrastructureConfig{
-		Organization: &models.OrganizationLayerConfig{AWSAccount: "123456789012"},
+		Organization:  &models.OrganizationLayerConfig{AWSAccount: "123456789012"},
 		EnableSecrets: ptrBool(true),
 	}
 	if !shouldGenerateSecretsForPath(infra, "organization", "", "org") {

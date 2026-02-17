@@ -276,11 +276,11 @@ infrastructure:
 
 func TestSaveConfig(t *testing.T) {
 	tests := []struct {
-		name         string
-		configFile   string
-		expectError  bool
-		errorMsg     string   // if set, error must contain this
-		errorMsgAlt  []string // optional: any of these also accepted (e.g. OS-specific "permission denied")
+		name        string
+		configFile  string
+		expectError bool
+		errorMsg    string   // if set, error must contain this
+		errorMsgAlt []string // optional: any of these also accepted (e.g. OS-specific "permission denied")
 	}{
 		{
 			name:        "save valid config",
