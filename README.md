@@ -402,7 +402,7 @@ infrastructure:
 
 ### Projects and workloads
 
-**What they are:** For each environment you list *projects* (e.g. core, common) and *workloads* (e.g. webapp, api). They become directories like `project/core/production` and `workload/webapp/production`. The directory name is the key by default; you can set `name` (display + dir from lowercased name) or `dir_name` (exact directory name). Workloads can have `depends_on` (which project layers they depend on) and per-item `enable_secrets` / `enable_terragrunt`.
+**What they are:** For each environment you list *projects* (e.g. core, common) and *workloads* (e.g. webapp, api). They become directories like `project/core/production` and `workload/webapp/production`. The directory name is the key by default; you can set `name` (display + dir from lowercased name) or `dir_name` (exact directory name). Projects and workloads can have `depends_on` (e.g. project: `["foundation"]` or `[]`; workload: which project layers they depend on) and per-item `enable_secrets` / `enable_terragrunt`.
 
 ```yaml
 infrastructure:
@@ -719,11 +719,11 @@ infrastructure:
 - `project/{name}`: depends on `foundation/{env}`
 - `workload/{name}`: depends on `project/{name}/{env}` if that project exists for the environment, otherwise `project/common/{env}` (fallback)
 
-Use `depends_on` on a workload to override (e.g. `["project/common", "project/core"]`) or `[]` for no dependencies.
+Use `depends_on` on a **project** (e.g. `["foundation"]`, `["base", "foundation"]`, or `[]` for none) or on a **workload** (e.g. `["project/common", "project/core"]`, or `[]` for no dependencies).
 
 **Behavior:**
 - **Default**: Automatic dependencies based on layer hierarchy
-- **Custom**: You can specify relative paths in `depends_on`
+- **Custom**: You can specify relative paths in `depends_on` (project: `foundation` / `base`; workload: `project/<key>`, `foundation`, `base`)
 - **No dependencies**: Use `depends_on: []` to disable
 
 <details>

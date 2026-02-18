@@ -247,6 +247,52 @@ func convertToStringSlice(slice []interface{}) []string {
 	return result
 }
 
+// hasExplicitDependsOnProject returns true when the project item has depends_on set (including to []).
+// Used to distinguish "no key" (use default) from "depends_on: []" (no dependencies).
+func hasExplicitDependsOnProject(item interface{}) bool {
+	switch v := item.(type) {
+	case map[interface{}]interface{}:
+		if m := ToMapStringInterface(v); m != nil {
+			return hasExplicitDependsOnProject(m)
+		}
+		return false
+	case map[string]interface{}:
+		if nested := getNestedMap(v); nested != nil {
+			if _, ok := nested["depends_on"]; ok {
+				return true
+			}
+		}
+		_, ok := v["depends_on"]
+		return ok
+	case ProjectItem:
+		return v.DependsOn != nil
+	}
+	return false
+}
+
+// hasExplicitDependsOnWorkload returns true when the workload item has depends_on set (including to []).
+// Used to distinguish "no key" (use default) from "depends_on: []" (no dependencies).
+func hasExplicitDependsOnWorkload(item interface{}) bool {
+	switch v := item.(type) {
+	case map[interface{}]interface{}:
+		if m := ToMapStringInterface(v); m != nil {
+			return hasExplicitDependsOnWorkload(m)
+		}
+		return false
+	case map[string]interface{}:
+		if nested := getNestedMap(v); nested != nil {
+			if _, ok := nested["depends_on"]; ok {
+				return true
+			}
+		}
+		_, ok := v["depends_on"]
+		return ok
+	case WorkloadItem:
+		return v.DependsOn != nil
+	}
+	return false
+}
+
 // NameToDirName converts a display name to a directory-safe name: lowercase and spaces to underscores.
 // Used when name is used as directory and dir_name is not specified (project, workload, environment).
 func NameToDirName(name string) string {
@@ -525,41 +571,63 @@ func CalculateDependencies(layer, project, envKey string, config *Infrastructure
 	case "foundation":
 		return []string{"../../base/" + dirName}
 	case "project":
+		if exists {
+			for _, projectItem := range envConfig.Projects {
+				if GetProjectKey(projectItem) != project {
+					continue
+				}
+				if !hasExplicitDependsOnProject(projectItem) {
+					break
+				}
+				deps := GetProjectDependencies(projectItem)
+				var out []string
+				for _, dep := range deps {
+					if strings.HasPrefix(dep, "foundation") {
+						out = append(out, "../../../foundation/"+dirName)
+					} else if strings.HasPrefix(dep, "base") {
+						out = append(out, "../../base/"+dirName)
+					} else {
+						out = append(out, dep)
+					}
+				}
+				return out
+			}
+		}
 		return []string{"../../../foundation/" + dirName}
 	case "workload":
-		// Check if there are explicit dependencies for this workload
+		// Check if there are explicit dependencies for this workload (including depends_on: [] for none)
 		if exists {
 			for _, workloadItem := range envConfig.Workloads {
 				workloadKey := GetWorkloadKey(workloadItem)
-				workloadDeps := GetWorkloadDependencies(workloadItem)
-				if workloadKey == project && len(workloadDeps) > 0 {
-					// Convert relative paths to absolute paths
-					var dependencies []string
-					for _, dep := range workloadDeps {
-						if strings.HasPrefix(dep, "project/") {
-							// Convert "project/key" to "../../../project/dirName/envDirName"
-							// Find the project to get its directory name
-							projectKey := strings.TrimPrefix(dep, "project/")
-							for _, projItem := range envConfig.Projects {
-								if GetProjectKey(projItem) == projectKey {
-									projectDirName := GetProjectDirectoryName(projItem)
-									dependencies = append(dependencies, "../../../project/"+projectDirName+"/"+dirName)
-									break
-								}
-							}
-						} else if strings.HasPrefix(dep, "foundation") {
-							// Convert "foundation" to "../../../foundation/dirName"
-							dependencies = append(dependencies, "../../../foundation/"+dirName)
-						} else if strings.HasPrefix(dep, "base") {
-							// Convert "base" to "../../../base/dirName"
-							dependencies = append(dependencies, "../../../base/"+dirName)
-						} else {
-							// Assume it's already a relative path
-							dependencies = append(dependencies, dep)
-						}
-					}
-					return dependencies
+				if workloadKey != project {
+					continue
 				}
+				if !hasExplicitDependsOnWorkload(workloadItem) {
+					break
+				}
+				workloadDeps := GetWorkloadDependencies(workloadItem)
+				// Explicit depends_on: [] means no dependencies
+				var dependencies []string
+				for _, dep := range workloadDeps {
+					if strings.HasPrefix(dep, "project/") {
+						// Convert "project/key" to "../../../project/dirName/envDirName"
+						projectKey := strings.TrimPrefix(dep, "project/")
+						for _, projItem := range envConfig.Projects {
+							if GetProjectKey(projItem) == projectKey {
+								projectDirName := GetProjectDirectoryName(projItem)
+								dependencies = append(dependencies, "../../../project/"+projectDirName+"/"+dirName)
+								break
+							}
+						}
+					} else if strings.HasPrefix(dep, "foundation") {
+						dependencies = append(dependencies, "../../../foundation/"+dirName)
+					} else if strings.HasPrefix(dep, "base") {
+						dependencies = append(dependencies, "../../../base/"+dirName)
+					} else {
+						dependencies = append(dependencies, dep)
+					}
+				}
+				return dependencies
 			}
 		}
 
