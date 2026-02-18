@@ -19,22 +19,25 @@ infrastructure:
   # secrets:
   #   type: "ssm"  # or "sops"
   # Optional: organization layer overrides (secrets, providers, backend, SSO for gocloud sso login/setup)
-  # organization:
+  organization:
+    aws_account: "112345678900"   # Required for SSO: creates profile {client}-org so sso login --all includes it
+    providers:
+      default_providers:
+        - name: "aws"
+          region: "${local.metadata.aws_region}"
+        - name: "aws"
+          alias: "sha"
+          region: "${local.metadata.aws_region}"
+          assume_role:          
+            role_arn: "arn:aws:iam::123456789012:role/OrganizationAccountAccessRole"
+            session_name: "TerraformSession"
+        # - name: "gitlab"
   #   secrets:
   #     type: "sops"
-  #   providers:   # Use these default_providers for organization/providers.tf (e.g. assume_role cross-account)
-  #     default_providers:
-  #       - name: "aws"
-  #         region: "local.metadata.aws_region"
-  #         alias: "sha"
-  #         assume_role:
-  #           role_arn: "arn:aws:iam::904233109008:role/OrganizationAccountAccessRole"
-  #           session_name: "TerraformSession"
   #   backend:     # Optional: override backend only for organization/backend.tf (pattern, region, encrypt, etc.)
   #     pattern: "org-backend"
   #     region: "us-east-1"
   #     encrypt: true
-  #   aws_account: "112345678900"   # Required for SSO: creates profile {client}-org so sso login --all includes it
   #   aws_sso:                      # Optional: override SSO for org profile
   #     start_url: "https://..."
   #     role_name: "Admin"
