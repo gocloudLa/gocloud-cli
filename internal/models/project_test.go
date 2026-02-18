@@ -652,6 +652,73 @@ func TestCalculateDependencies(t *testing.T) {
 	}
 }
 
+// TestCalculateDependencies_ProjectDependsOn ensures project layer respects depends_on from config.
+// Without this, project layer always returns default foundation dependency and ignores project depends_on.
+func TestCalculateDependencies_ProjectDependsOn(t *testing.T) {
+	config := &InfrastructureConfig{
+		Client: "test-client",
+		Environments: map[string]Environment{
+			"dev": {
+				Name:       "Development",
+				DirName:    "dev",
+				AWSAccount: "123456789012",
+				Projects: []interface{}{
+					ProjectItem{Key: "core", DependsOn: []string{"foundation"}},
+				},
+			},
+		},
+	}
+	// Project with explicit depends_on: [foundation] should still return foundation path (same as default here)
+	result := CalculateDependencies("project", "core", "dev", config)
+	expected := []string{"../../../foundation/dev"}
+	if len(result) != len(expected) || (len(result) > 0 && result[0] != expected[0]) {
+		t.Errorf("CalculateDependencies(project, core, dev) with depends_on:[foundation] = %v, want %v", result, expected)
+	}
+
+	// Project with depends_on: [] should return no dependencies
+	configNoDeps := &InfrastructureConfig{
+		Client: "test-client",
+		Environments: map[string]Environment{
+			"dev": {
+				Name:       "Development",
+				DirName:    "dev",
+				AWSAccount: "123456789012",
+				Projects: []interface{}{
+					ProjectItem{Key: "core", DependsOn: []string{}},
+				},
+			},
+		},
+	}
+	resultEmpty := CalculateDependencies("project", "core", "dev", configNoDeps)
+	if len(resultEmpty) != 0 {
+		t.Errorf("CalculateDependencies(project, core, dev) with depends_on:[] = %v, want []", resultEmpty)
+	}
+}
+
+// TestCalculateDependencies_WorkloadDependsOnEmpty ensures workload with depends_on: [] returns no dependencies.
+// Without this, the code only uses explicit deps when len(workloadDeps) > 0, so depends_on: [] falls through to default.
+// We use workload key "core" so that the default would be ../../../project/core/dev; with depends_on: [] we want [].
+func TestCalculateDependencies_WorkloadDependsOnEmpty(t *testing.T) {
+	config := &InfrastructureConfig{
+		Client: "test-client",
+		Environments: map[string]Environment{
+			"dev": {
+				Name:       "Development",
+				DirName:    "dev",
+				AWSAccount: "123456789012",
+				Projects:   []interface{}{"core"},
+				Workloads: []interface{}{
+					WorkloadItem{Key: "core", DependsOn: []string{}},
+				},
+			},
+		},
+	}
+	result := CalculateDependencies("workload", "core", "dev", config)
+	if len(result) != 0 {
+		t.Errorf("CalculateDependencies(workload, core, dev) with depends_on:[] = %v, want []", result)
+	}
+}
+
 func TestResolveVersion(t *testing.T) {
 	tests := []struct {
 		name          string
