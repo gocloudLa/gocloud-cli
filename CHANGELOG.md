@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/gocloudLa/gocloud-cli/compare/v1.2.0...v1.2.1) (2026-02-18)
+
+
+### Bug Fixes
+
+* **terragrunt:** depends_on for empty use case ([#9](https://github.com/gocloudLa/gocloud-cli/issues/9)) ([4085406](https://github.com/gocloudLa/gocloud-cli/commit/40854060ad3e9fe45b5f5b987f04a1722c11ed59))
+* **validation:** yaml values validation ([6f44d16](https://github.com/gocloudLa/gocloud-cli/commit/6f44d16bfe20a73725f58bffe7223b72558fc43b))
+
 ## [1.2.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.1.0...v1.2.0) (2026-02-14)
 
 
