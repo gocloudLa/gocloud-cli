@@ -2017,6 +2017,19 @@ func (pg *ProjectGenerator) Generate() error {
 // shouldGenerateSecrets determines if secrets should be generated for a specific layer/project
 // following the hierarchy: workload/project -> environment -> infrastructure (same as shouldGenerateTerragrunt).
 func (pg *ProjectGenerator) shouldGenerateSecrets(layerType, project, env string) bool {
+	// Organization layer is global: allow infrastructure.organization.enable_secrets override.
+	if layerType == "organization" {
+		// Organization layer only exists when configured with aws_account (handled by Generate flow),
+		// but secrets enablement is decided here.
+		if pg.config.Organization != nil && pg.config.Organization.EnableSecrets != nil {
+			return *pg.config.Organization.EnableSecrets
+		}
+		if pg.config.EnableSecrets != nil {
+			return *pg.config.EnableSecrets
+		}
+		return true
+	}
+
 	// Get environment configuration
 	envConfig, exists := pg.config.Environments[env]
 	if !exists {

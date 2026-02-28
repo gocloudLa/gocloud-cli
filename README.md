@@ -321,6 +321,7 @@ infrastructure:
   # Optional: organization layer + SSO profile {client}-org (uncomment to enable)
   organization:
     aws_account: "123456789012"   # Required for SSO: creates profile {client}-org
+  #   enable_secrets: true        # (optional) secrets only for organization (overrides global enable_secrets)
   #   aws_sso:                    # (optional) override SSO for org profile
   #     start_url: "https://..."
   #     role_name: "Admin"

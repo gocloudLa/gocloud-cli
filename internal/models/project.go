@@ -24,6 +24,7 @@ type OrganizationLayerConfig struct {
 	Secrets    *SecretsConfig               `json:"secrets" yaml:"secrets,omitempty"`
 	Providers  *ProviderConfig              `json:"providers" yaml:"providers,omitempty"`     // default_providers (e.g. with assume_role) for organization/providers.tf
 	Backend    *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`         // optional backend override for organization/backend.tf
+	EnableSecrets *bool                     `json:"enable_secrets" yaml:"enable_secrets,omitempty"`
 	AWSAccount string                       `json:"aws_account" yaml:"aws_account,omitempty"` // AWS account ID for organization (SSO profile client-org)
 	AWSSSO     *SSOConfig                   `json:"aws_sso" yaml:"aws_sso,omitempty"`         // Optional SSO overrides for organization profile
 }

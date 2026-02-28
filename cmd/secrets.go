@@ -619,6 +619,10 @@ func shouldGenerateSecretsForPath(infra *models.InfrastructureConfig, layerType,
 		if infra.Layers != nil && infra.Layers.Organization != nil && !*infra.Layers.Organization {
 			return false
 		}
+		// organization-level override (supports enable_secrets: false / true inside infrastructure.organization)
+		if infra.Organization.EnableSecrets != nil {
+			return *infra.Organization.EnableSecrets
+		}
 		if infra.EnableSecrets != nil {
 			return *infra.EnableSecrets
 		}

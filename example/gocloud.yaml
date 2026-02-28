@@ -21,6 +21,7 @@ infrastructure:
   # Optional: organization layer overrides (secrets, providers, backend, SSO for gocloud sso login/setup)
   organization:
     aws_account: "112345678900"   # Required for SSO: creates profile {client}-org so sso login --all includes it
+    # enable_secrets: true        # (optional) secrets only for organization (overrides global enable_secrets)
     providers:
       default_providers:
         - name: "aws"
