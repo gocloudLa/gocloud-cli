@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.2.1...v1.3.0) (2026-03-02)
+
+
+### Features
+
+* **organization:** add enable_secrets override. ([#10](https://github.com/gocloudLa/gocloud-cli/issues/10)) ([6cdbd5b](https://github.com/gocloudLa/gocloud-cli/commit/6cdbd5bbad3382ad60b3cc67b3173d0100209253))
+
 ## [1.2.1](https://github.com/gocloudLa/gocloud-cli/compare/v1.2.0...v1.2.1) (2026-02-18)
 
 
