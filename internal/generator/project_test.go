@@ -1277,6 +1277,66 @@ func TestGenerateOrganizationSecrets_NotGeneratedWhenSecretsDisabled(t *testing.
 	}
 }
 
+func TestGenerateOrganizationSecrets_NotGeneratedWhenOrganizationEnableSecretsFalse(t *testing.T) {
+	// When enable_secrets is true globally but infrastructure.organization.enable_secrets is false,
+	// organization/_secrets.tf must NOT be created (org override wins).
+	config := &models.InfrastructureConfig{
+		Client:        "test-client",
+		Company:       "gcl",
+		Region:        "us-east-1",
+		EnableSecrets: ptrBool(true),
+		Organization: &models.OrganizationLayerConfig{
+			AWSAccount:     "112345678900",
+			EnableSecrets: ptrBool(false),
+		},
+		Layers: &models.LayerConfig{
+			Base:         ptrBool(false),
+			Foundation:   ptrBool(false),
+			Organization: ptrBool(true),
+		},
+		Environments: map[string]models.Environment{},
+	}
+	tempDir := t.TempDir()
+	pg := NewProjectGenerator(config, tempDir, true)
+	if err := pg.Generate(); err != nil {
+		t.Fatalf("Generate() = %v", err)
+	}
+	secretsPath := filepath.Join(tempDir, "organization", "_secrets.tf")
+	if _, err := os.Stat(secretsPath); err == nil {
+		t.Errorf("organization/_secrets.tf must not exist when infrastructure.organization.enable_secrets is false (override)")
+	}
+}
+
+func TestGenerateOrganizationSecrets_GeneratedWhenOrganizationEnableSecretsTrue(t *testing.T) {
+	// When enable_secrets is false globally but infrastructure.organization.enable_secrets is true,
+	// organization/_secrets.tf must be created (org override wins).
+	config := &models.InfrastructureConfig{
+		Client:        "test-client",
+		Company:       "gcl",
+		Region:        "us-east-1",
+		EnableSecrets: ptrBool(false),
+		Organization: &models.OrganizationLayerConfig{
+			AWSAccount:     "112345678900",
+			EnableSecrets: ptrBool(true),
+		},
+		Layers: &models.LayerConfig{
+			Base:         ptrBool(false),
+			Foundation:   ptrBool(false),
+			Organization: ptrBool(true),
+		},
+		Environments: map[string]models.Environment{},
+	}
+	tempDir := t.TempDir()
+	pg := NewProjectGenerator(config, tempDir, true)
+	if err := pg.Generate(); err != nil {
+		t.Fatalf("Generate() = %v", err)
+	}
+	secretsPath := filepath.Join(tempDir, "organization", "_secrets.tf")
+	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
+		t.Errorf("organization/_secrets.tf must exist when infrastructure.organization.enable_secrets is true (override)")
+	}
+}
+
 func TestGenerateOrganizationSecrets_NotGeneratedWhenOrganizationLayerDisabled(t *testing.T) {
 	// When organization layer is disabled, organization directory may still exist from structure
 	// but we must not generate organization-specific files if we skip the layer; in practice

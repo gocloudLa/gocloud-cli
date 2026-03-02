@@ -149,3 +149,22 @@ func TestShouldGenerateSecretsForPath_Organization(t *testing.T) {
 		t.Error("shouldGenerateSecretsForPath(organization) with layers.organization false should be false")
 	}
 }
+
+func TestShouldGenerateSecretsForPath_OrganizationEnableSecretsOverride(t *testing.T) {
+	infra := &models.InfrastructureConfig{
+		Organization: &models.OrganizationLayerConfig{
+			AWSAccount:     "123456789012",
+			EnableSecrets: ptrBool(false),
+		},
+		EnableSecrets: ptrBool(true),
+	}
+	if shouldGenerateSecretsForPath(infra, "organization", "", "org") {
+		t.Error("shouldGenerateSecretsForPath(organization) must respect organization.enable_secrets=false override")
+	}
+
+	infra.Organization.EnableSecrets = ptrBool(true)
+	infra.EnableSecrets = ptrBool(false)
+	if !shouldGenerateSecretsForPath(infra, "organization", "", "org") {
+		t.Error("shouldGenerateSecretsForPath(organization) must respect organization.enable_secrets=true override")
+	}
+}
