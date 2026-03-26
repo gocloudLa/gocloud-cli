@@ -1286,7 +1286,7 @@ func TestGenerateOrganizationSecrets_NotGeneratedWhenOrganizationEnableSecretsFa
 		Region:        "us-east-1",
 		EnableSecrets: ptrBool(true),
 		Organization: &models.OrganizationLayerConfig{
-			AWSAccount:     "112345678900",
+			AWSAccount:    "112345678900",
 			EnableSecrets: ptrBool(false),
 		},
 		Layers: &models.LayerConfig{
@@ -1316,7 +1316,7 @@ func TestGenerateOrganizationSecrets_GeneratedWhenOrganizationEnableSecretsTrue(
 		Region:        "us-east-1",
 		EnableSecrets: ptrBool(false),
 		Organization: &models.OrganizationLayerConfig{
-			AWSAccount:     "112345678900",
+			AWSAccount:    "112345678900",
 			EnableSecrets: ptrBool(true),
 		},
 		Layers: &models.LayerConfig{

@@ -153,7 +153,7 @@ func TestShouldGenerateSecretsForPath_Organization(t *testing.T) {
 func TestShouldGenerateSecretsForPath_OrganizationEnableSecretsOverride(t *testing.T) {
 	infra := &models.InfrastructureConfig{
 		Organization: &models.OrganizationLayerConfig{
-			AWSAccount:     "123456789012",
+			AWSAccount:    "123456789012",
 			EnableSecrets: ptrBool(false),
 		},
 		EnableSecrets: ptrBool(true),

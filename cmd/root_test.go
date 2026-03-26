@@ -260,6 +260,12 @@ func TestRootCommandSubcommands(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name:        "health subcommand",
+			subcommand:  "health",
+			args:        []string{"--help"},
+			expectError: false,
+		},
+		{
 			name:        "completion subcommand",
 			subcommand:  "completion",
 			args:        []string{"--help"},

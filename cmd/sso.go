@@ -444,13 +444,7 @@ func loadConfiguration() (*models.Config, error) {
 // We add it when organization.aws_account is set, unless layers.organization is explicitly false.
 // So if you have organization.aws_account but no "layers" key, you still get the org profile.
 func organizationSSOEnabled(infra *models.InfrastructureConfig) bool {
-	if infra == nil || infra.Organization == nil || infra.Organization.AWSAccount == "" {
-		return false
-	}
-	if infra.Layers != nil && infra.Layers.Organization != nil && !*infra.Layers.Organization {
-		return false
-	}
-	return true
+	return models.IsOrganizationEnabled(infra)
 }
 
 // generateAWSConfig generates AWS config content from project configuration

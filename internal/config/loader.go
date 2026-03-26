@@ -54,7 +54,7 @@ func LoadConfigWithPathAndAWS(configPath string) (*models.Config, error) {
 
 	// Set AWS_CONFIG_FILE environment variable to use local .aws/config
 	// This ensures secrets commands use the same AWS configuration as SSO commands
-	awsConfigFile := filepath.Join(".", ".aws", "config")
+	awsConfigFile := filepath.Join(filepath.Dir(configPath), ".aws", "config")
 	if err := os.Setenv("AWS_CONFIG_FILE", awsConfigFile); err != nil {
 		return nil, fmt.Errorf("failed to set AWS_CONFIG_FILE: %w", err)
 	}
