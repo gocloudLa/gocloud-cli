@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.3.0...v1.4.0) (2026-03-26)
+
+
+### Features
+
+* **health:** notification center check ([#12](https://github.com/gocloudLa/gocloud-cli/issues/12)) ([36c417a](https://github.com/gocloudLa/gocloud-cli/commit/36c417a0276e808c7a89094f5f50344517f139db))
+
 ## [1.3.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.2.1...v1.3.0) (2026-03-02)
 
 
