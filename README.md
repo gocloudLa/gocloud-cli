@@ -200,6 +200,33 @@ gocloud secrets edit base/production
 gocloud secrets edit project/core/production
 ```
 
+### Health
+
+Check AWS managed notification events per environment (AWS User Notifications / Notification Center → AWS managed). This helps reduce noise from emails/SNS by presenting events grouped by environment.
+
+#### `gocloud health check`
+Lists managed notification events for one environment or all.
+
+```bash
+gocloud health check --environment prd
+gocloud health check --environment org  # organization account ({client}-org) when configured
+gocloud health check --all
+```
+
+Filter controls:
+
+```bash
+gocloud health check --all --managed-days 180
+gocloud health check --all --include-ended   # include events whose end time is already past
+```
+
+Output format:
+
+```bash
+gocloud health check --all --output list   # default
+gocloud health check --all --output table
+```
+
 ### Modules
 
 Generate READMEs for Terraform modules from a YAML config and optional template.

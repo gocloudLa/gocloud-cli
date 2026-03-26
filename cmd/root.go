@@ -60,6 +60,7 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(ssoCmd)
 	rootCmd.AddCommand(secretsCmd)
+	rootCmd.AddCommand(healthCmd)
 	rootCmd.AddCommand(moduleCmd)
 	rootCmd.AddCommand(versionCmd)
 

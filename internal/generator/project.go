@@ -2383,13 +2383,7 @@ func (pg *ProjectGenerator) isOrganizationLayerEnabled() bool {
 // IsOrganizationLayerEnabledForConfig reports whether the organization layer should be generated
 // for the given infrastructure config. Used by cmd (e.g. dry-run) and tests.
 func IsOrganizationLayerEnabledForConfig(config *models.InfrastructureConfig) bool {
-	if config == nil || config.Organization == nil || config.Organization.AWSAccount == "" {
-		return false
-	}
-	if config.Layers != nil && config.Layers.Organization != nil && !*config.Layers.Organization {
-		return false
-	}
-	return true
+	return models.IsOrganizationEnabled(config)
 }
 
 // GetEnabledLayersFromConfig returns all enabled layer paths from the configuration

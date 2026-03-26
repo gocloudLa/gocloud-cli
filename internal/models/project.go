@@ -21,12 +21,12 @@ type LayerConfig struct {
 // Use this when the organization layer needs a different secrets (or other) config than the global default.
 // AWSAccount is required for SSO setup/login: when set, gocloud sso setup generates a profile {client}-org.
 type OrganizationLayerConfig struct {
-	Secrets    *SecretsConfig               `json:"secrets" yaml:"secrets,omitempty"`
-	Providers  *ProviderConfig              `json:"providers" yaml:"providers,omitempty"`     // default_providers (e.g. with assume_role) for organization/providers.tf
-	Backend    *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`         // optional backend override for organization/backend.tf
-	EnableSecrets *bool                     `json:"enable_secrets" yaml:"enable_secrets,omitempty"`
-	AWSAccount string                       `json:"aws_account" yaml:"aws_account,omitempty"` // AWS account ID for organization (SSO profile client-org)
-	AWSSSO     *SSOConfig                   `json:"aws_sso" yaml:"aws_sso,omitempty"`         // Optional SSO overrides for organization profile
+	Secrets       *SecretsConfig               `json:"secrets" yaml:"secrets,omitempty"`
+	Providers     *ProviderConfig              `json:"providers" yaml:"providers,omitempty"` // default_providers (e.g. with assume_role) for organization/providers.tf
+	Backend       *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`     // optional backend override for organization/backend.tf
+	EnableSecrets *bool                        `json:"enable_secrets" yaml:"enable_secrets,omitempty"`
+	AWSAccount    string                       `json:"aws_account" yaml:"aws_account,omitempty"` // AWS account ID for organization (SSO profile client-org)
+	AWSSSO        *SSOConfig                   `json:"aws_sso" yaml:"aws_sso,omitempty"`         // Optional SSO overrides for organization profile
 }
 
 // SecretsConfig represents the secrets backend configuration
@@ -1057,6 +1057,18 @@ func (config *InfrastructureConfig) GetEnvironmentOrder() []string {
 	// Note: This is a fallback - ideally EnvironmentOrder should be set during config loading
 	sort.Strings(keys)
 	return keys
+}
+
+// IsOrganizationEnabled reports whether the special organization layer/profile is enabled.
+// Rule: organization.aws_account must be set, unless layers.organization is explicitly false.
+func IsOrganizationEnabled(config *InfrastructureConfig) bool {
+	if config == nil || config.Organization == nil || config.Organization.AWSAccount == "" {
+		return false
+	}
+	if config.Layers != nil && config.Layers.Organization != nil && !*config.Layers.Organization {
+		return false
+	}
+	return true
 }
 
 // ResolveProviderConfig resolves provider configuration with hierarchy
