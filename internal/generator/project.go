@@ -761,6 +761,19 @@ func (pg *ProjectGenerator) generateRootConfigs() error {
 		}
 	}
 
+	if IsGitignoreGenerationEnabledForConfig(pg.config) {
+		gitignorePath := filepath.Join(pg.workingDir, ".gitignore")
+		if err := pg.writeFileWithConfirmation(gitignorePath, infrastructureGitignoreContent); err != nil {
+			if errors.Is(err, ErrFileSkipped) {
+				logger.Info(".gitignore skipped by user")
+			} else {
+				return err
+			}
+		}
+	} else {
+		logger.Info(".gitignore skipped - infrastructure.enable_gitignore is false")
+	}
+
 	// Note: terragrunt.hcl in root is no longer needed with the new structure
 
 	return nil
@@ -2384,6 +2397,18 @@ func (pg *ProjectGenerator) isOrganizationLayerEnabled() bool {
 // for the given infrastructure config. Used by cmd (e.g. dry-run) and tests.
 func IsOrganizationLayerEnabledForConfig(config *models.InfrastructureConfig) bool {
 	return models.IsOrganizationEnabled(config)
+}
+
+// IsGitignoreGenerationEnabledForConfig reports whether gocloud generate should write root `.gitignore`.
+// Default is true when omitted; set infrastructure.enable_gitignore: false to skip (CLI does not manage the file).
+func IsGitignoreGenerationEnabledForConfig(config *models.InfrastructureConfig) bool {
+	if config == nil {
+		return true
+	}
+	if config.EnableGitignore != nil {
+		return *config.EnableGitignore
+	}
+	return true
 }
 
 // GetEnabledLayersFromConfig returns all enabled layer paths from the configuration

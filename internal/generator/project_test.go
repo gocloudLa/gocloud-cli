@@ -1146,6 +1146,61 @@ func TestGetEnabledLayersFromConfig(t *testing.T) {
 
 func ptrBool(b bool) *bool { return &b }
 
+func TestGenerate_WritesRootGitignore(t *testing.T) {
+	config := &models.InfrastructureConfig{
+		Client:  "test-client",
+		Company: "gcl",
+		Region:  "us-east-1",
+		Layers: &models.LayerConfig{
+			Base:       ptrBool(false),
+			Foundation: ptrBool(false),
+		},
+		Environments: map[string]models.Environment{},
+	}
+	tempDir := t.TempDir()
+	pg := NewProjectGenerator(config, tempDir, true)
+	if err := pg.Generate(); err != nil {
+		t.Fatalf("Generate() = %v", err)
+	}
+	gitignorePath := filepath.Join(tempDir, ".gitignore")
+	b, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		t.Fatalf("read .gitignore: %v", err)
+	}
+	body := string(b)
+	if !strings.Contains(body, "DO NOT EDIT MANUALLY - Changes will be overwritten on next generation") {
+		t.Errorf(".gitignore must include GoCloud CLI legend like providers.tf; got:\n%s", body)
+	}
+	if !strings.Contains(body, ".terragrunt-cache") || !strings.Contains(body, "**/.terraform/*") {
+		t.Errorf(".gitignore must contain Terragrunt and Terraform ignore patterns; got:\n%s", body)
+	}
+}
+
+func TestGenerate_SkipsGitignoreWhenEnableGitignoreFalse(t *testing.T) {
+	config := &models.InfrastructureConfig{
+		Client:          "test-client",
+		Company:         "gcl",
+		Region:          "us-east-1",
+		EnableGitignore: ptrBool(false),
+		Layers: &models.LayerConfig{
+			Base:       ptrBool(false),
+			Foundation: ptrBool(false),
+		},
+		Environments: map[string]models.Environment{},
+	}
+	tempDir := t.TempDir()
+	pg := NewProjectGenerator(config, tempDir, true)
+	if err := pg.Generate(); err != nil {
+		t.Fatalf("Generate() = %v", err)
+	}
+	gitignorePath := filepath.Join(tempDir, ".gitignore")
+	if _, err := os.Stat(gitignorePath); err == nil {
+		t.Errorf(".gitignore must not be created when infrastructure.enable_gitignore is false")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat .gitignore: %v", err)
+	}
+}
+
 func TestGenerateOrganizationSecrets_GeneratesFileWhenEnabled(t *testing.T) {
 	// When organization layer is enabled (layers.organization + infrastructure.organization.aws_account) and enable_secrets is true,
 	// Generate() must create organization/_secrets.tf.

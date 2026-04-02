@@ -15,6 +15,7 @@ infrastructure:
   # source_ref: "main"  # branch, tag, or commit hash
   enable_secrets: true  # Global secrets setting (default: true)
   enable_terragrunt: true  # Global terragrunt setting (default: true)
+  # enable_gitignore: true  # (default: true) generate root .gitignore; false = CLI does not write .gitignore
   # Secrets backend configuration (optional, default backend: "ssm")
   # secrets:
   #   type: "ssm"  # or "sops"
