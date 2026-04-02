@@ -551,6 +551,27 @@ func TestIsOrganizationLayerEnabledForConfig(t *testing.T) {
 	}
 }
 
+func TestIsGitignoreGenerationEnabledForConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   *models.InfrastructureConfig
+		expected bool
+	}{
+		{name: "nil config defaults to true", config: nil, expected: true},
+		{name: "empty infrastructure defaults to true", config: &models.InfrastructureConfig{}, expected: true},
+		{name: "explicit true", config: &models.InfrastructureConfig{EnableGitignore: &[]bool{true}[0]}, expected: true},
+		{name: "explicit false", config: &models.InfrastructureConfig{EnableGitignore: &[]bool{false}[0]}, expected: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := generator.IsGitignoreGenerationEnabledForConfig(tt.config)
+			if got != tt.expected {
+				t.Errorf("IsGitignoreGenerationEnabledForConfig() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestGetDirectoryName(t *testing.T) {
 	tests := []struct {
 		envKey   string

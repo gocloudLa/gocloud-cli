@@ -93,7 +93,7 @@ gocloud config validate --strict             # Extra validation rules
 ### Generate
 
 #### `gocloud generate [--config file.yaml]`
-Reads `gocloud.yaml` and generates the directory tree (base, foundation, project, workload), config files (main.tf, metadata.tf, terragrunt.hcl, backend.tf, providers.tf, _secrets.tf where enabled), and project README.md. Validation runs first. New dirs/files are created without prompting; existing `main.tf` are never overwritten (only the module version line is updated when you change version in config); other changed files prompt before overwrite.
+Reads `gocloud.yaml` and generates the directory tree (base, foundation, project, workload), config files (main.tf, metadata.tf, terragrunt.hcl, backend.tf, providers.tf, _secrets.tf where enabled), optionally a root `.gitignore` when `infrastructure.enable_gitignore` is not `false` (default: true), and project README.md. Validation runs first. New dirs/files are created without prompting; existing `main.tf` are never overwritten (only the module version line is updated when you change version in config); other changed files (including `.gitignore` when enabled) prompt before overwrite.
 
 ```bash
 gocloud generate                          # Simple usage
@@ -287,6 +287,7 @@ infrastructure:
   # enable_secrets: true    # (default: true) generate _secrets.tf and gocloud secrets commands
   # enable_sso: true        # (default: true) generate SSO profile
   # enable_terragrunt: true # (default: true) generate terragrunt.hcl files
+  # enable_gitignore: true  # (default: true) generate root .gitignore
 
   # # Optional: use Git repo instead of Terraform registry for modules
   # source: "git@github.com:org/repo.git"
@@ -509,6 +510,17 @@ infrastructure:
 ```
 
 ---
+
+### Root `.gitignore`
+
+GoCloud generates a root `.gitignore` when `enable_gitignore: true` (default). It uses the same generated-file header and overwrite prompts as `providers.tf`. Set `false` if you manage `.gitignore` yourself—the CLI will not create or update it. **Override levels:** infrastructure only.
+
+**Example** (opt out):
+
+```yaml
+infrastructure:
+  enable_gitignore: false
+```
 
 ### Terragrunt control
 

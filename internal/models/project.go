@@ -44,6 +44,7 @@ type InfrastructureConfig struct {
 	SourceRef        string                       `json:"source_ref" yaml:"source_ref,omitempty"`
 	EnableSecrets    *bool                        `json:"enable_secrets" yaml:"enable_secrets,omitempty"`
 	EnableTerragrunt *bool                        `json:"enable_terragrunt" yaml:"enable_terragrunt,omitempty"`
+	EnableGitignore  *bool                        `json:"enable_gitignore" yaml:"enable_gitignore,omitempty"`
 	Layers           *LayerConfig                 `json:"layers" yaml:"layers,omitempty"`
 	Backend          *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`
 	AWSSSO           *SSOConfig                   `json:"aws_sso" yaml:"aws_sso,omitempty"`

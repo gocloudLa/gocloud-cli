@@ -186,6 +186,9 @@ func showDirectoryStructure(config *models.InfrastructureConfig) {
 	utils.PrintText("   ├── project/\n")
 	utils.PrintText("   ├── workload/\n")
 	utils.PrintText("   ├── organization/\n")
+	if generator.IsGitignoreGenerationEnabledForConfig(config) {
+		utils.PrintText("   ├── .gitignore\n")
+	}
 	utils.PrintText("   ├── root.hcl\n")
 	utils.PrintText("   └── README.md\n")
 
@@ -354,6 +357,9 @@ func showFilesToGenerate(config *models.InfrastructureConfig) {
 	}
 
 	// Root level files
+	if generator.IsGitignoreGenerationEnabledForConfig(config) {
+		utils.PrintText("   %s/.gitignore\n", baseDir)
+	}
 	utils.PrintText("   %s/root.hcl\n", baseDir)
 	utils.PrintText("   %s/README.md\n", baseDir)
 
