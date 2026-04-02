@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.0...v1.5.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* **deps:** bump AWS SDK and related modules (go.mod / go.sum) ([#16](https://github.com/gocloudLa/gocloud-cli/issues/16)) ([be3dcae](https://github.com/gocloudLa/gocloud-cli/commit/be3dcae79348107c6c181ed61fa8284de8ec83ae))
+
 ## [1.5.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.4.0...v1.5.0) (2026-04-02)
 
 
