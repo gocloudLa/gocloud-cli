@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.4.0...v1.5.0) (2026-04-02)
+
+
+### Features
+
+* **gitignore:** add gitignore generation support ([#14](https://github.com/gocloudLa/gocloud-cli/issues/14)) ([a0cd6e5](https://github.com/gocloudLa/gocloud-cli/commit/a0cd6e53948779ada110e226f10c392653bb4fed))
+
 ## [1.4.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.3.0...v1.4.0) (2026-03-26)
 
 
