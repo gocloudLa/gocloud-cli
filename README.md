@@ -660,7 +660,7 @@ GoCloud generates `backend.tf` (Terraform state: S3 + DynamoDB). If you omit `ba
 - `{{.Layer}}` — Layer type (e.g. `"base"`, `"foundation"`, `"project"`, `"workload"`)
 - `{{.Project}}` — Project key (only for project/workload layers; e.g. `"core"`, `"dept"`)
 - `{{.Environment}}` — Environment key (e.g. `"prd"`, `"dev"`, `"stg"`)
-- `{{.EnvironmentName}}` — Environment name in lowercase (e.g. `"production"`)
+- `{{.EnvironmentName}}` — From environment `name`: lowercased, spaces → underscores.
 - `{{.Company}}` — Company prefix (e.g. `"gcl"`)
 - `{{.Region}}` — AWS region (e.g. `"us-east-1"`)
 - `{{.Client}}` — Client name (e.g. `"test-client"`)
@@ -673,7 +673,7 @@ GoCloud generates `backend.tf` (Terraform state: S3 + DynamoDB). If you omit `ba
 - `{{.Layer}}` — Layer type (e.g. `"base"`, `"foundation"`, `"project"`, `"workload"`)
 - `{{.Project}}` — Project key (only for project/workload layers)
 - `{{.Environment}}` — Environment key (e.g. `"prd"`, `"dev"`, `"stg"`)
-- `{{.EnvironmentName}}` — Environment name in lowercase (e.g. `"production"`)
+- `{{.EnvironmentName}}` — From environment `name`: lowercased, spaces → underscores (same normalization as display-name→folder for projects/workloads).
 - `{{.Region}}` — AWS region (e.g. `"us-east-1"`)
 - `{{.Client}}` — Client name (e.g. `"test-client"`)
 
