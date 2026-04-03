@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.1...v1.5.2) (2026-04-03)
+
+
+### Bug Fixes
+
+* **backend:** replace spaces in environment name with underscores ([#18](https://github.com/gocloudLa/gocloud-cli/issues/18)) ([f2f6fb3](https://github.com/gocloudLa/gocloud-cli/commit/f2f6fb37bd8a6958311925f2ae6a05f5117155b7))
+
 ## [1.5.1](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.0...v1.5.1) (2026-04-02)
 
 
