@@ -768,7 +768,7 @@ func TestGetDirectoryName(t *testing.T) {
 		{
 			name:     "environment with empty dir_name",
 			env:      "prd",
-			expected: "production", // Uses NameToDirName(Name): lowercase, spaces to _
+			expected: "production", // NormalizeDisplayName(Name): lowercase, spaces to _
 		},
 		{
 			name:     "non-existent environment",
@@ -979,13 +979,24 @@ func TestProcessKeyTemplate(t *testing.T) {
 		Client:  "test-client",
 		Company: "gcl",
 		Region:  "us-east-1",
+		Environments: map[string]models.Environment{
+			"prd": {
+				Name:       "Production",
+				DirName:    "prd",
+				AWSAccount: "123456789012",
+			},
+			"stg": {
+				Name:       "Pre Production",
+				AWSAccount: "999999999999",
+			},
+			"weird": {
+				Name:       "Production",
+				DirName:    "something",
+				AWSAccount: "111111111111",
+			},
+		},
 	}
 	pg := NewProjectGenerator(config, "/tmp", false)
-	envConfig := models.Environment{
-		Name:       "Production",
-		DirName:    "prd",
-		AWSAccount: "123456789012",
-	}
 
 	tests := []struct {
 		name      string
@@ -1012,18 +1023,35 @@ func TestProcessKeyTemplate(t *testing.T) {
 			expected:  "gcl-prd",
 		},
 		{
-			name:      "AccountID and EnvironmentName",
+			name:      "EnvironmentName from name not dir_name",
 			template:  "{{.AccountID}}-{{.EnvironmentName}}",
 			layerType: "base",
 			project:   "",
 			env:       "prd",
 			expected:  "123456789012-production",
 		},
+		{
+			name:      "dir_name does not affect EnvironmentName",
+			template:  "{{.EnvironmentName}}",
+			layerType: "base",
+			project:   "",
+			env:       "weird",
+			expected:  "production",
+		},
+		{
+			name:      "EnvironmentName from name spaces to underscores",
+			template:  "{{.EnvironmentName}}/x",
+			layerType: "base",
+			project:   "",
+			env:       "stg",
+			expected:  "pre_production/x",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := pg.processKeyTemplate(tt.template, tt.layerType, tt.project, tt.env, envConfig)
+			envCfg := config.Environments[tt.env]
+			got := pg.processKeyTemplate(tt.template, tt.layerType, tt.project, tt.env, envCfg)
 			if got != tt.expected {
 				t.Errorf("processKeyTemplate() = %q, expected %q", got, tt.expected)
 			}

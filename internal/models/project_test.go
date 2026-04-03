@@ -258,7 +258,7 @@ func TestGetProjectDisplayName_MapInterfaceFormat(t *testing.T) {
 	}
 }
 
-func TestNameToDirName(t *testing.T) {
+func TestNormalizeDisplayName(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -271,12 +271,27 @@ func TestNameToDirName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NameToDirName(tt.input)
+			got := NormalizeDisplayName(tt.input)
 			if got != tt.expected {
-				t.Errorf("NameToDirName(%q) = %q, want %q", tt.input, got, tt.expected)
+				t.Errorf("NormalizeDisplayName(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
 		})
 	}
+}
+
+func TestEnvironmentNameForBackendKey(t *testing.T) {
+	t.Run("uses Name when set", func(t *testing.T) {
+		got := EnvironmentNameForBackendKey("prd", Environment{Name: "Production", DirName: "PIJA"})
+		if got != "production" {
+			t.Errorf("got %q, want production (dir_name must be ignored)", got)
+		}
+	})
+	t.Run("falls back to env key", func(t *testing.T) {
+		got := EnvironmentNameForBackendKey("prd", Environment{DirName: "only_dir"})
+		if got != "prd" {
+			t.Errorf("got %q, want prd", got)
+		}
+	})
 }
 
 func TestGetProjectDirectoryName(t *testing.T) {

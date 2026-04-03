@@ -295,10 +295,21 @@ func hasExplicitDependsOnWorkload(item interface{}) bool {
 	return false
 }
 
-// NameToDirName converts a display name to a directory-safe name: lowercase and spaces to underscores.
-// Used when name is used as directory and dir_name is not specified (project, workload, environment).
-func NameToDirName(name string) string {
+// NormalizeDisplayName turns a human-readable name into a stable lowercase token: whitespace trimmed
+// and collapsed, words joined with underscores. Used for generated directory names (when dir_name is
+// not set), backend key segments, and similar — not only filesystem paths.
+func NormalizeDisplayName(name string) string {
 	return strings.Join(strings.Fields(strings.ToLower(name)), "_")
+}
+
+// EnvironmentNameForBackendKey is the value for {{.EnvironmentName}} in key_template and role_template,
+// and the default S3 key segment when key_template is omitted. It uses NormalizeDisplayName(env.Name) when
+// name is set, otherwise the environment YAML key. dir_name does not affect this.
+func EnvironmentNameForBackendKey(envKey string, env Environment) string {
+	if env.Name != "" {
+		return NormalizeDisplayName(env.Name)
+	}
+	return envKey
 }
 
 // GetProjectDisplayName extracts the display name for a project (name if specified, otherwise key)
@@ -353,7 +364,7 @@ func GetProjectDirectoryName(item interface{}) string {
 			}
 			// 2. name (lowercase, spaces to _)
 			if name, ok := nested["name"].(string); ok {
-				return NameToDirName(name)
+				return NormalizeDisplayName(name)
 			}
 		}
 		// Check for direct fields (old format: {dir_name: "value", name: "value"})
@@ -361,7 +372,7 @@ func GetProjectDirectoryName(item interface{}) string {
 			return dirName
 		}
 		if name, ok := v["name"].(string); ok {
-			return NameToDirName(name)
+			return NormalizeDisplayName(name)
 		}
 		// 3. key (fallback)
 		return getMapKey(v)
@@ -370,7 +381,7 @@ func GetProjectDirectoryName(item interface{}) string {
 			return v.DirName
 		}
 		if v.Name != "" {
-			return NameToDirName(v.Name)
+			return NormalizeDisplayName(v.Name)
 		}
 		return v.Key
 	}
@@ -471,7 +482,7 @@ func GetWorkloadDirectoryName(item interface{}) string {
 			}
 			// 2. name (lowercase, spaces to _)
 			if name, ok := nested["name"].(string); ok {
-				return NameToDirName(name)
+				return NormalizeDisplayName(name)
 			}
 		}
 		// Check for direct fields (old format: {dir_name: "value", name: "value"})
@@ -479,7 +490,7 @@ func GetWorkloadDirectoryName(item interface{}) string {
 			return dirName
 		}
 		if name, ok := v["name"].(string); ok {
-			return NameToDirName(name)
+			return NormalizeDisplayName(name)
 		}
 		// 3. key (fallback)
 		return getMapKey(v)
@@ -488,7 +499,7 @@ func GetWorkloadDirectoryName(item interface{}) string {
 			return v.DirName
 		}
 		if v.Name != "" {
-			return NameToDirName(v.Name)
+			return NormalizeDisplayName(v.Name)
 		}
 		return v.Key
 	}
@@ -559,7 +570,7 @@ func CalculateDependencies(layer, project, envKey string, config *Infrastructure
 			dirName = envConfig.DirName
 		} else if envConfig.Name != "" {
 			// Option 2: Use name as directory (lowercase, spaces to _)
-			dirName = NameToDirName(envConfig.Name)
+			dirName = NormalizeDisplayName(envConfig.Name)
 		}
 		// Option 3: Use environment key (fallback) - already set above
 	}

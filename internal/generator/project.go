@@ -1108,7 +1108,7 @@ func (pg *ProjectGenerator) getDirectoryName(envKey string) string {
 
 	// Option 2: Use name as directory (lowercase, spaces to _)
 	if envConfig.Name != "" {
-		return models.NameToDirName(envConfig.Name)
+		return models.NormalizeDisplayName(envConfig.Name)
 	}
 
 	// Option 3: Use environment key (fallback)
@@ -1823,9 +1823,10 @@ func (pg *ProjectGenerator) buildBackendTemplateData(layerType, project, env str
 			// Organization is a single layer without environment; key is account/organization/terraform.tfstate
 			keyTemplate = fmt.Sprintf("%s/organization/terraform.tfstate", envConfig.AWSAccount)
 		} else {
-			keyTemplate = fmt.Sprintf("%s/%s-%s/terraform.tfstate", envConfig.AWSAccount, layerType, strings.ToLower(envConfig.Name))
+			envSeg := models.EnvironmentNameForBackendKey(env, envConfig)
+			keyTemplate = fmt.Sprintf("%s/%s-%s/terraform.tfstate", envConfig.AWSAccount, layerType, envSeg)
 			if project != "" {
-				keyTemplate = fmt.Sprintf("%s/%s-%s-%s/terraform.tfstate", envConfig.AWSAccount, layerType, project, strings.ToLower(envConfig.Name))
+				keyTemplate = fmt.Sprintf("%s/%s-%s-%s/terraform.tfstate", envConfig.AWSAccount, layerType, project, envSeg)
 			}
 		}
 	} else {
@@ -1894,7 +1895,7 @@ func (pg *ProjectGenerator) processKeyTemplate(template, layerType, project, env
 	result = strings.ReplaceAll(result, "{{.Layer}}", layerType)
 	result = strings.ReplaceAll(result, "{{.Project}}", project)
 	result = strings.ReplaceAll(result, "{{.Environment}}", env)
-	result = strings.ReplaceAll(result, "{{.EnvironmentName}}", strings.ToLower(envConfig.Name))
+	result = strings.ReplaceAll(result, "{{.EnvironmentName}}", models.EnvironmentNameForBackendKey(env, envConfig))
 	result = strings.ReplaceAll(result, "{{.Company}}", pg.config.Company)
 	result = strings.ReplaceAll(result, "{{.Region}}", pg.config.Region)
 	result = strings.ReplaceAll(result, "{{.Client}}", pg.config.Client)
@@ -1916,7 +1917,7 @@ func (pg *ProjectGenerator) processRoleTemplate(template, layerType, project, en
 	result = strings.ReplaceAll(result, "{{.Layer}}", layerType)
 	result = strings.ReplaceAll(result, "{{.Project}}", project)
 	result = strings.ReplaceAll(result, "{{.Environment}}", env)
-	result = strings.ReplaceAll(result, "{{.EnvironmentName}}", strings.ToLower(envConfig.Name))
+	result = strings.ReplaceAll(result, "{{.EnvironmentName}}", models.EnvironmentNameForBackendKey(env, envConfig))
 	result = strings.ReplaceAll(result, "{{.Company}}", pg.config.Company)
 	result = strings.ReplaceAll(result, "{{.BackendAccount}}", pg.config.Backend.Account)
 	result = strings.ReplaceAll(result, "{{.BackendPattern}}", pg.config.Backend.Pattern)
