@@ -2462,20 +2462,10 @@ func GetEnabledLayersFromConfig(config *models.Config) []string {
 // getRegionForEnvironment returns the region for a specific environment
 // following the hierarchy: environment -> infrastructure -> default
 func (pg *ProjectGenerator) getRegionForEnvironment(envKey string) string {
-	// Get environment configuration
-	envConfig, exists := pg.config.Environments[envKey]
-	if !exists {
-		// If environment doesn't exist, use infrastructure default
-		return pg.config.Region
+	if pg.config == nil {
+		return ""
 	}
-
-	// Check environment level
-	if envConfig.Region != "" {
-		return envConfig.Region
-	}
-
-	// Fall back to infrastructure level
-	return pg.config.Region
+	return pg.config.RegionForEnvironment(envKey)
 }
 
 // generateEnvironmentTable generates a markdown table with environment information

@@ -1554,6 +1554,28 @@ func TestGetVersion(t *testing.T) {
 	}
 }
 
+func TestInfrastructureConfig_RegionForEnvironment(t *testing.T) {
+	infra := &InfrastructureConfig{
+		Region: "us-east-1",
+		Environments: map[string]Environment{
+			"prd": {AWSAccount: "111111111111", Region: "eu-west-1"},
+			"dev": {AWSAccount: "222222222222"},
+		},
+	}
+	if got := infra.RegionForEnvironment("prd"); got != "eu-west-1" {
+		t.Errorf("RegionForEnvironment(prd) = %q, want eu-west-1", got)
+	}
+	if got := infra.RegionForEnvironment("dev"); got != "us-east-1" {
+		t.Errorf("RegionForEnvironment(dev) = %q, want us-east-1", got)
+	}
+	if got := infra.RegionForEnvironment("missing"); got != "us-east-1" {
+		t.Errorf("RegionForEnvironment(missing) = %q, want us-east-1", got)
+	}
+	if got := infra.RegionForEnvironment("org"); got != "us-east-1" {
+		t.Errorf("RegionForEnvironment(org) = %q, want us-east-1", got)
+	}
+}
+
 func TestGetEnvironmentOrder(t *testing.T) {
 	tests := []struct {
 		name     string
