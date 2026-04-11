@@ -273,7 +273,7 @@ const providersTemplate = `# ===================================================
 
 {{range .Providers}}
 provider "{{.Name}}" {
-{{if .Region}}  region  = "{{.Region}}"
+{{if .Region}}  region  = {{.RegionHCL}}
 {{end}}{{if .Alias}}  alias   = "{{.Alias}}"
 {{end}}{{if .Profile}}  profile = "{{.Profile}}"
 {{end}}{{if .AssumeRole}}  assume_role {

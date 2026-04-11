@@ -709,7 +709,7 @@ infrastructure:
 
 ### Providers
 
-GoCloud generates `providers.tf` (AWS providers). If you omit `providers:`, defaults are used: `use_profiles: true` and one AWS provider with `region: "local.metadata.aws_region"` plus an optional second with `region: "us-east-1"`, `alias: "use1"`. **Override levels:** see table above.
+GoCloud generates `providers.tf` (AWS providers). If you omit `providers:`, defaults are used: `use_profiles: true` and one AWS provider with `region = local.metadata.aws_region` (reference to `locals` in `metadata.tf`) plus an optional second with `region = "us-east-1"`, `alias: "use1"`. For `default_providers[].region`, values that match the same built-in AWS region list used for `metadata.key.region` short codes are written quoted in HCL; anything else is copied unchanged (`local.*`, `var.*`, `${...}`, etc.). **Override levels:** see table above.
 
 **Example** (global + overrides at env, project, workload):
 

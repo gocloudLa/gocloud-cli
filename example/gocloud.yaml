@@ -9,7 +9,7 @@ infrastructure:
   client: test-client
   company: gcl
   region: us-east-1
-  version: 0.17.0
+  version: 0.28.0
   # Optional: Use custom Git source instead of registry
   # source: "git@github.com:gocloudLa/terraform-aws-standard-platform.git"
   # source_ref: "main"  # branch, tag, or commit hash
@@ -26,10 +26,10 @@ infrastructure:
     providers:
       default_providers:
         - name: "aws"
-          region: "${local.metadata.aws_region}"
+          region: "local.metadata.aws_region"
         - name: "aws"
           alias: "sha"
-          region: "${local.metadata.aws_region}"
+          region: "local.metadata.aws_region"
           assume_role:          
             role_arn: "arn:aws:iam::123456789012:role/OrganizationAccountAccessRole"
             session_name: "TerraformSession"

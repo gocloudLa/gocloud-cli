@@ -968,6 +968,31 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 	}
 }
 
+func TestProviderSpec_RegionHCL(t *testing.T) {
+	tests := []struct {
+		region string
+		want   string
+	}{
+		{"local.metadata.aws_region", "local.metadata.aws_region"},
+		{"  local.metadata.aws_region  ", "  local.metadata.aws_region  "},
+		{"${local.a}${local.b}", "${local.a}${local.b}"},
+		{"var.aws_region", "var.aws_region"},
+		{"data.aws_region.current.name", "data.aws_region.current.name"},
+		{"us-east-2", `"us-east-2"`},
+		{"  us-east-2  ", "  us-east-2  "},
+		{"eu-central-1", `"eu-central-1"`},
+		{"ap-southeast-1", `"ap-southeast-1"`},
+		{"not-a-region", "not-a-region"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		got := ProviderSpec{Region: tt.region}.RegionHCL()
+		if got != tt.want {
+			t.Errorf("RegionHCL(%q) = %q, want %q", tt.region, got, tt.want)
+		}
+	}
+}
+
 // TestResolveProviderConfigWithProjectWorkloadOverrides tests provider override at project and workload level
 // (as documented in gocloud-example-config.yaml: project/workload "dept" with providers overrides).
 func TestResolveProviderConfigWithProjectWorkloadOverrides(t *testing.T) {
