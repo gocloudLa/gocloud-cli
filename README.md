@@ -42,7 +42,7 @@ make build
 sudo cp bin/gocloud /usr/local/bin/
 ```
 
-Check for updates: `gocloud version --check` (use `--update` to auto-update on Unix).
+Check for updates: `gocloud version check`. Update on macOS/Linux: `gocloud version update`.
 
 ## Quick start
 
@@ -60,13 +60,13 @@ gocloud sso login --all      # Login to all SSO profiles
 
 ### Version and update
 
-#### `gocloud version [--check] [--update]`
-Shows current CLI version and optional update check/install.
+#### `gocloud version [check|update]`
+Shows current CLI version; subcommands compare with GitHub Releases or replace the binary (macOS/Linux when a matching release asset exists). Installation steps for all platforms are documented on [GitHub Releases](https://github.com/gocloudLa/gocloud-cli/releases).
 
 ```bash
-gocloud version                  # Current version (build time, commit)
-gocloud version --check          # Compare with GitHub Releases
-gocloud version --check --update # Auto Update
+gocloud version        # Current version (build time, commit)
+gocloud version check  # Check if you're on the latest release
+gocloud version update # Download and replace this binary (macOS/Linux only)
 ```
 
 ### Config

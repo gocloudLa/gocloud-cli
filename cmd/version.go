@@ -10,36 +10,46 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	versionCheck  bool
-	versionUpdate bool
-)
+const cliReleasesURL = "https://github.com/gocloudLa/gocloud-cli/releases"
 
-// versionCmd represents the version command
+// versionCmd shows the current CLI version; use subcommands check and update for GitHub release logic.
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Show version and optionally check for updates",
-	Long: `Show the current GoCloud CLI version.
+	Short: "Show CLI version",
+	Long: `Show the GoCloud CLI version (build time and git commit).
 
-With --check, compares against the latest release on GitHub and reports if an update
-is available. If outdated, you can use --update to attempt an automatic update
-(replaces the current binary; on Windows manual update is recommended), or run the
-printed manual commands.`,
-	RunE: runVersion,
+Use "gocloud version check" to compare with the latest release on GitHub.
+Use "gocloud version update" to replace this binary from the latest release (macOS/Linux when a matching asset exists).`,
+	RunE: runVersionShow,
+}
+
+var versionCheckCmd = &cobra.Command{
+	Use:   "check",
+	Short: "Check for a newer release on GitHub",
+	RunE:  runVersionCheck,
+}
+
+var versionUpdateCmd = &cobra.Command{
+	Use:   "update",
+	Short: "Update this binary from the latest GitHub release (macOS/Linux)",
+	Long: `Compares with the latest release on GitHub and, if you are outdated and a matching
+asset exists, replaces this binary. On Windows, install or upgrade using the official
+documentation and releases page.`,
+	RunE: runVersionUpdate,
 }
 
 func init() {
-	versionCmd.Flags().BoolVar(&versionCheck, "check", false, "check for latest version on GitHub")
-	versionCmd.Flags().BoolVar(&versionUpdate, "update", false, "if outdated, attempt to update the binary automatically (Unix only)")
+	versionCmd.AddCommand(versionCheckCmd)
+	versionCmd.AddCommand(versionUpdateCmd)
 }
 
-func runVersion(cmd *cobra.Command, _ []string) error {
-	// Always show current version
+func runVersionShow(cmd *cobra.Command, _ []string) error {
 	fmt.Fprintln(os.Stdout, cmd.Root().Version)
+	return nil
+}
 
-	if !versionCheck {
-		return nil
-	}
+func runVersionCheck(cmd *cobra.Command, _ []string) error {
+	fmt.Fprintln(os.Stdout, cmd.Root().Version)
 
 	result, err := versionpkg.Check(version)
 	if err != nil {
@@ -54,42 +64,47 @@ func runVersion(cmd *cobra.Command, _ []string) error {
 	fmt.Fprintf(os.Stdout, "A new version is available: %s (you have %s).\n", result.LatestVersion, result.CurrentVersion)
 
 	if result.DownloadURL == "" {
-		fmt.Fprintln(os.Stderr, "No pre-built binary for your platform in this release. Build from source: go install github.com/gocloudLa/gocloud-cli@latest")
+		fmt.Fprintf(os.Stderr, "No pre-built binary for this platform in that release. See %s\n", cliReleasesURL)
 		return nil
 	}
 
-	// Manual update commands (all platforms)
-	printManualUpdateCommands(result)
-
-	if versionUpdate {
-		if runtime.GOOS == "windows" {
-			fmt.Fprintln(os.Stderr, "Automatic update is not supported on Windows. Use the commands above to update.")
-			return nil
-		}
-		fmt.Fprintln(os.Stdout, "Updating...")
-		if err := versionpkg.DownloadAndReplace(result.DownloadURL); err != nil {
-			return fmt.Errorf("auto-update failed: %w", err)
-		}
-		fmt.Fprintln(os.Stdout, "Update complete. Run 'gocloud version' to verify.")
+	if runtime.GOOS == "windows" {
+		fmt.Fprintf(os.Stdout, "Automatic update from the CLI is not available on Windows. See %s for installation instructions.\n", cliReleasesURL)
+		return nil
 	}
 
+	fmt.Fprintf(os.Stdout, "Run '%s version update' to update.\n", cmd.Root().Name())
 	return nil
 }
 
-func printManualUpdateCommands(result *versionpkg.CheckResult) {
-	const repo = "https://github.com/gocloudLa/gocloud-cli/releases"
-	fmt.Fprintln(os.Stdout, "")
-	fmt.Fprintln(os.Stdout, "To update manually, run:")
-	fmt.Fprintln(os.Stdout, "")
+func runVersionUpdate(cmd *cobra.Command, _ []string) error {
+	fmt.Fprintln(os.Stdout, cmd.Root().Version)
 
 	if runtime.GOOS == "windows" {
-		fmt.Fprintf(os.Stdout, "  curl -sL -o gocloud.exe %s\n", result.DownloadURL)
-		fmt.Fprintln(os.Stdout, "  # Then move gocloud.exe to your PATH (e.g. replace existing gocloud.exe)")
-	} else {
-		fmt.Fprintf(os.Stdout, "  curl -sL -o gocloud \"%s\"\n", result.DownloadURL)
-		fmt.Fprintln(os.Stdout, "  chmod +x gocloud")
-		fmt.Fprintln(os.Stdout, "  sudo mv gocloud /usr/local/bin/   # or another directory in your PATH)")
+		fmt.Fprintf(os.Stderr, "Automatic update is not supported on Windows. See %s for installation instructions.\n", cliReleasesURL)
+		return nil
 	}
-	fmt.Fprintln(os.Stdout, "")
-	fmt.Fprintf(os.Stdout, "Or see all releases: %s\n", repo)
+
+	result, err := versionpkg.Check(version)
+	if err != nil {
+		return fmt.Errorf("check for updates: %w", err)
+	}
+
+	if result.IsUpToDate {
+		fmt.Fprintln(os.Stdout, "You are already on the latest release.")
+		return nil
+	}
+
+	if result.DownloadURL == "" {
+		fmt.Fprintf(os.Stderr, "No pre-built binary for this platform in that release. See %s\n", cliReleasesURL)
+		return nil
+	}
+
+	fmt.Fprintf(os.Stdout, "Updating to %s...\n", result.LatestVersion)
+	if err := versionpkg.DownloadAndReplace(result.DownloadURL); err != nil {
+		fmt.Fprintf(os.Stderr, "Update failed. See %s for installation instructions.\n", cliReleasesURL)
+		return fmt.Errorf("update: %w", err)
+	}
+	fmt.Fprintln(os.Stdout, "Update complete. Run 'gocloud version' to verify.")
+	return nil
 }

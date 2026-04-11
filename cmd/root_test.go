@@ -24,6 +24,11 @@ func TestExecute(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name:        "version subcommand",
+			args:        []string{"gocloud", "version"},
+			expectError: false,
+		},
+		{
 			name:        "invalid command",
 			args:        []string{"gocloud", "invalid-command"},
 			expectError: true,
