@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.3](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.2...v1.5.3) (2026-04-11)
+
+
+### Bug Fixes
+
+* **secrets:** use per-env AWS region for SSM and SOPS ([#20](https://github.com/gocloudLa/gocloud-cli/issues/20)) ([f499336](https://github.com/gocloudLa/gocloud-cli/commit/f49933687ac24c9a34baaac9f974ae75ba692416))
+
 ## [1.5.2](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.1...v1.5.2) (2026-04-03)
 
 
