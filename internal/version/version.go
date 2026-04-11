@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	repoOwner = "gocloudLa"
-	repoName  = "gocloud-cli"
-	apiURL    = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
+	repoOwner       = "gocloudLa"
+	repoName        = "gocloud-cli"
+	apiURL          = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
+	releasesPageURL = "https://github.com/" + repoOwner + "/" + repoName + "/releases"
 )
 
 // Release represents a GitHub release (subset of API response).
@@ -222,7 +223,7 @@ func DownloadAndReplace(url string) error {
 
 	// Replace: rename temp over existing binary (works on Unix while binary is running)
 	if err := os.Rename(tmpPath, self); err != nil {
-		return fmt.Errorf("replace binary failed (try manual update): %w", err)
+		return fmt.Errorf("replace binary failed; see %s: %w", releasesPageURL, err)
 	}
 	removeTmp = false
 	_ = written
