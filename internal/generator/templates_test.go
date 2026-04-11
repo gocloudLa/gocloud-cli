@@ -544,6 +544,9 @@ func TestTemplateEngineRenderProvidersWithAssumeRole(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Render() failed: %v", err)
 	}
+	if want := "region  = local.metadata.aws_region"; !strings.Contains(result, want) {
+		t.Errorf("Render() result should contain %q for unquoted local ref; got:\n%s", want, result)
+	}
 	for _, s := range []string{"assume_role {", "role_arn", "OrganizationAccountAccessRole", "session_name", "TerraformSession"} {
 		if !strings.Contains(result, s) {
 			t.Errorf("Render() result does not contain expected string: %q", s)

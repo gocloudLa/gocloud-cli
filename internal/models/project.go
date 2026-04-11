@@ -856,11 +856,24 @@ type ProviderAssumeRole struct {
 // values in Extra should be valid HCL right-hand side (e.g. "value" for strings, true/false, numbers).
 type ProviderSpec struct {
 	Name       string              `json:"name" yaml:"name"`             // "aws", "gitlab", etc.
-	Region     string              `json:"region" yaml:"region"`         // AWS: "us-east-1" or "local.metadata.aws_region"
+	Region     string              `json:"region" yaml:"region"`         // AWS region literal (quoted in HCL) or any other HCL expression passed through as-is
 	Alias      string              `json:"alias" yaml:"alias,omitempty"` // "use1"
 	Profile    string              `json:"profile" yaml:"profile,omitempty"`
 	AssumeRole *ProviderAssumeRole `json:"assume_role" yaml:"assume_role,omitempty"`
 	Extra      map[string]string   `json:"extra" yaml:"extra,omitempty"` // Arbitrary provider args (e.g. base_url for gitlab)
+}
+
+// RegionHCL returns the HCL right-hand side for provider "region".
+// If the value is a known AWS region name (same set as metadata short codes), it is quoted; otherwise the string is unchanged.
+func (p ProviderSpec) RegionHCL() string {
+	s := p.Region
+	if s == "" {
+		return ""
+	}
+	if IsKnownAWSRegion(s) {
+		return `"` + s + `"`
+	}
+	return s
 }
 
 // knownProviderSpecKeys are top-level keys that are not put into Extra when parsing from YAML/map.
