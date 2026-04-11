@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.5](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.4...v1.5.5) (2026-04-11)
+
+
+### Bug Fixes
+
+* **version:** add check and update subcommands ([#24](https://github.com/gocloudLa/gocloud-cli/issues/24)) ([308770e](https://github.com/gocloudLa/gocloud-cli/commit/308770e2fea67b91810ab0279cbfe16a1f4086da))
+
 ## [1.5.4](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.3...v1.5.4) (2026-04-11)
 
 
