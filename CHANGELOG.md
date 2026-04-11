@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.4](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.3...v1.5.4) (2026-04-11)
+
+
+### Bug Fixes
+
+* **providers:** known AWS regions quoted in providers.tf ([#22](https://github.com/gocloudLa/gocloud-cli/issues/22)) ([546dd47](https://github.com/gocloudLa/gocloud-cli/commit/546dd47611a92435925adfe2563bbdf7856fdc1a))
+
 ## [1.5.3](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.2...v1.5.3) (2026-04-11)
 
 
