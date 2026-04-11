@@ -107,7 +107,7 @@ func (m *Manager) getSSMClientForLayer(layer *Layer) (*ssm.Client, error) {
 
 	// Load AWS configuration with the specific profile and config file
 	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
-		awsconfig.WithRegion(m.config.Infrastructure.Region),
+		awsconfig.WithRegion(m.config.Infrastructure.RegionForEnvironment(layer.Environment)),
 		awsconfig.WithSharedConfigProfile(profileName),
 		awsconfig.WithSharedConfigFiles([]string{configFile}),
 	)

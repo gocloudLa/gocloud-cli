@@ -99,16 +99,10 @@ func (m *SOPSManager) getKMSClientForEnvironment(envKey string) (*kms.Client, er
 
 // getRegionForEnvironment returns the region for a specific environment
 func (m *SOPSManager) getRegionForEnvironment(envKey string) string {
-	envConfig, exists := m.config.Infrastructure.Environments[envKey]
-	if !exists {
-		return m.config.Infrastructure.Region
+	if m.config == nil || m.config.Infrastructure == nil {
+		return ""
 	}
-
-	if envConfig.Region != "" {
-		return envConfig.Region
-	}
-
-	return m.config.Infrastructure.Region
+	return m.config.Infrastructure.RegionForEnvironment(envKey)
 }
 
 // getAccountForEnvironment returns AWS account ID and display name for an env key.

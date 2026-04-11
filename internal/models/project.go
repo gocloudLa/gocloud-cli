@@ -1052,6 +1052,22 @@ func (env Environment) GetVersion(infra *InfrastructureConfig) string {
 	return "latest"
 }
 
+// RegionForEnvironment returns the effective AWS region for an environment key (metadata, SSM, SOPS, etc.).
+// Priority: Environments[envKey].region if set, else infrastructure.region.
+// Empty envKey or "org" uses only infrastructure.region.
+func (c *InfrastructureConfig) RegionForEnvironment(envKey string) string {
+	if c == nil {
+		return ""
+	}
+	if envKey == "" || envKey == "org" {
+		return c.Region
+	}
+	if envCfg, ok := c.Environments[envKey]; ok && envCfg.Region != "" {
+		return envCfg.Region
+	}
+	return c.Region
+}
+
 // GetEnvironmentOrder returns the environments in the order they were defined
 func (config *InfrastructureConfig) GetEnvironmentOrder() []string {
 	// If we have explicit order, use it
