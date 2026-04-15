@@ -15,6 +15,7 @@ type LayerConfig struct {
 	Base         *bool `json:"base" yaml:"base,omitempty"`
 	Foundation   *bool `json:"foundation" yaml:"foundation,omitempty"`
 	Organization *bool `json:"organization" yaml:"organization,omitempty"` // Global only
+	Security     *bool `json:"security" yaml:"security,omitempty"`         // Global only
 }
 
 // OrganizationLayerConfig holds layer-specific overrides for the organization layer only.
@@ -56,6 +57,8 @@ type InfrastructureConfig struct {
 	Secrets *SecretsConfig `json:"secrets" yaml:"secrets,omitempty"`
 	// Organization layer overrides (secrets, etc.); only applies to the organization layer
 	Organization *OrganizationLayerConfig `json:"organization" yaml:"organization,omitempty"`
+	// Security layer overrides (same shape as organization); only applies to the security layer
+	Security *OrganizationLayerConfig `json:"security" yaml:"security,omitempty"`
 }
 
 // ProjectItem represents a project item that can be either a string or an object
@@ -581,6 +584,8 @@ func CalculateDependencies(layer, project, envKey string, config *Infrastructure
 		return []string{} // base doesn't depend on anything
 	case "organization":
 		return []string{} // organization is global, no dependencies (like base)
+	case "security":
+		return []string{} // security is global, no dependencies (like base)
 	case "foundation":
 		return []string{"../../base/" + dirName}
 	case "project":
@@ -1067,12 +1072,12 @@ func (env Environment) GetVersion(infra *InfrastructureConfig) string {
 
 // RegionForEnvironment returns the effective AWS region for an environment key (metadata, SSM, SOPS, etc.).
 // Priority: Environments[envKey].region if set, else infrastructure.region.
-// Empty envKey or "org" uses only infrastructure.region.
+// Empty envKey, "org", or "sec" uses only infrastructure.region.
 func (c *InfrastructureConfig) RegionForEnvironment(envKey string) string {
 	if c == nil {
 		return ""
 	}
-	if envKey == "" || envKey == "org" {
+	if envKey == "" || envKey == "org" || envKey == "sec" {
 		return c.Region
 	}
 	if envCfg, ok := c.Environments[envKey]; ok && envCfg.Region != "" {
@@ -1112,6 +1117,18 @@ func IsOrganizationEnabled(config *InfrastructureConfig) bool {
 	return true
 }
 
+// IsSecurityEnabled reports whether the security global layer/profile is enabled.
+// Rule: security.aws_account must be set, unless layers.security is explicitly false.
+func IsSecurityEnabled(config *InfrastructureConfig) bool {
+	if config == nil || config.Security == nil || config.Security.AWSAccount == "" {
+		return false
+	}
+	if config.Layers != nil && config.Layers.Security != nil && !*config.Layers.Security {
+		return false
+	}
+	return true
+}
+
 // ResolveProviderConfig resolves provider configuration with hierarchy
 // Priority: Organization override > Workload > Project > Environment > Global
 func (config *InfrastructureConfig) ResolveProviderConfig(layerType, projectKey, envKey string) *ProviderConfig {
@@ -1122,8 +1139,8 @@ func (config *InfrastructureConfig) ResolveProviderConfig(layerType, projectKey,
 		*result = *config.Providers
 	}
 
-	// Apply environment overrides (not used for organization; organization has no env in config)
-	if layerType != "organization" {
+	// Apply environment overrides (not used for organization/security; those layers have no env in config)
+	if layerType != "organization" && layerType != "security" {
 		if envConfig, exists := config.Environments[envKey]; exists && envConfig.Providers != nil {
 			result = mergeProviderConfigs(result, envConfig.Providers)
 		}
@@ -1150,6 +1167,9 @@ func (config *InfrastructureConfig) ResolveProviderConfig(layerType, projectKey,
 	if layerType == "organization" && config.Organization != nil && config.Organization.Providers != nil {
 		result = mergeProviderConfigs(result, config.Organization.Providers)
 	}
+	if layerType == "security" && config.Security != nil && config.Security.Providers != nil {
+		result = mergeProviderConfigs(result, config.Security.Providers)
+	}
 
 	return result
 }
@@ -1163,8 +1183,8 @@ func (config *InfrastructureConfig) ResolveBackendConfig(layerType, projectKey, 
 		*result = *config.Backend
 	}
 
-	// Apply environment overrides (not used for organization; organization has no env in config)
-	if layerType != "organization" {
+	// Apply environment overrides (not used for organization/security; those layers have no env in config)
+	if layerType != "organization" && layerType != "security" {
 		if envConfig, exists := config.Environments[envKey]; exists && envConfig.Backend != nil {
 			result = mergeBackendInfrastructureConfigs(result, envConfig.Backend)
 		}
@@ -1190,6 +1210,9 @@ func (config *InfrastructureConfig) ResolveBackendConfig(layerType, projectKey, 
 	// Apply organization-layer-specific override (only for the organization layer)
 	if layerType == "organization" && config.Organization != nil && config.Organization.Backend != nil {
 		result = mergeBackendInfrastructureConfigs(result, config.Organization.Backend)
+	}
+	if layerType == "security" && config.Security != nil && config.Security.Backend != nil {
+		result = mergeBackendInfrastructureConfigs(result, config.Security.Backend)
 	}
 
 	return result
@@ -1538,6 +1561,9 @@ func (config *InfrastructureConfig) ResolveSecretsConfig(layerType, projectKey, 
 	// Apply organization-layer-specific override (only for the organization layer)
 	if layerType == "organization" && config.Organization != nil && config.Organization.Secrets != nil {
 		result = mergeSecretsConfigs(result, config.Organization.Secrets)
+	}
+	if layerType == "security" && config.Security != nil && config.Security.Secrets != nil {
+		result = mergeSecretsConfigs(result, config.Security.Secrets)
 	}
 
 	return result

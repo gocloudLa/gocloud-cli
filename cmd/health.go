@@ -110,6 +110,8 @@ func runHealthCheck(cmd *cobra.Command, _ []string) error {
 		if !ok {
 			if envKey == "org" {
 				utils.PrintWarning("⚠️  %s: SKIPPED (organization layer not enabled in config)", envKey)
+			} else if envKey == "sec" {
+				utils.PrintWarning("⚠️  %s: SKIPPED (security layer not enabled in config)", envKey)
 			} else {
 				utils.PrintWarning("⚠️  %s: SKIPPED (environment not found in config)", envKey)
 			}
@@ -198,11 +200,17 @@ func selectEnvKeysForHealth(config *models.Config) []string {
 		if models.IsOrganizationEnabled(config.Infrastructure) {
 			keys = append(keys, "org")
 		}
+		if models.IsSecurityEnabled(config.Infrastructure) {
+			keys = append(keys, "sec")
+		}
 		sort.Strings(keys)
 		return keys
 	}
 	if healthCheckEnv != "" {
 		if healthCheckEnv == "org" && !models.IsOrganizationEnabled(config.Infrastructure) {
+			return nil
+		}
+		if healthCheckEnv == "sec" && !models.IsSecurityEnabled(config.Infrastructure) {
 			return nil
 		}
 		return []string{healthCheckEnv}
@@ -219,6 +227,12 @@ func accountIDForHealthEnv(infra *models.InfrastructureConfig, envKey string) (s
 			return "", false
 		}
 		return infra.Organization.AWSAccount, true
+	}
+	if envKey == "sec" {
+		if !models.IsSecurityEnabled(infra) {
+			return "", false
+		}
+		return infra.Security.AWSAccount, true
 	}
 	envCfg, ok := infra.Environments[envKey]
 	if !ok {

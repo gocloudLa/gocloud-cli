@@ -153,6 +153,9 @@ func runSSOSetup(cmd *cobra.Command, args []string) error {
 	if organizationSSOEnabled(config.Infrastructure) {
 		profileCount++
 	}
+	if securitySSOEnabled(config.Infrastructure) {
+		profileCount++
+	}
 	utils.PrintText("   Generated profiles: %d\n", profileCount)
 
 	return nil
@@ -447,6 +450,10 @@ func organizationSSOEnabled(infra *models.InfrastructureConfig) bool {
 	return models.IsOrganizationEnabled(infra)
 }
 
+func securitySSOEnabled(infra *models.InfrastructureConfig) bool {
+	return models.IsSecurityEnabled(infra)
+}
+
 // generateAWSConfig generates AWS config content from project configuration
 func generateAWSConfig(config *models.Config) (string, error) {
 	var content strings.Builder
@@ -531,6 +538,38 @@ func generateAWSConfig(config *models.Config) (string, error) {
 		content.WriteString(fmt.Sprintf("[profile %s]\n", profileName))
 		content.WriteString(fmt.Sprintf("sso_session = %s\n", sessionName))
 		content.WriteString(fmt.Sprintf("sso_account_id = %s\n", org.AWSAccount))
+		content.WriteString(fmt.Sprintf("sso_role_name = %s\n", ssoRoleName))
+		content.WriteString(fmt.Sprintf("region = %s\n", config.Infrastructure.Region))
+		content.WriteString("output = json\n")
+		content.WriteString("\n")
+	}
+
+	// Security layer: profile {client}-sec when security.aws_account is set (same rules as organization)
+	if securitySSOEnabled(config.Infrastructure) {
+		sec := config.Infrastructure.Security
+		profileName := fmt.Sprintf("%s-sec", client)
+		ssoStartURL := globalSSO.StartURL
+		ssoRoleName := globalSSO.RoleName
+		if sec.AWSSSO != nil {
+			if sec.AWSSSO.StartURL != "" {
+				ssoStartURL = sec.AWSSSO.StartURL
+			}
+			if sec.AWSSSO.RoleName != "" {
+				ssoRoleName = sec.AWSSSO.RoleName
+			}
+		}
+		sessionName := fmt.Sprintf("%s-sec", client)
+		if !writtenSessions[sessionName] {
+			content.WriteString(fmt.Sprintf("[sso-session %s]\n", sessionName))
+			content.WriteString(fmt.Sprintf("sso_start_url = %s\n", ssoStartURL))
+			content.WriteString(fmt.Sprintf("sso_region = %s\n", globalSSO.Region))
+			content.WriteString("sso_registration_scopes = sso:account:access\n")
+			content.WriteString("\n")
+			writtenSessions[sessionName] = true
+		}
+		content.WriteString(fmt.Sprintf("[profile %s]\n", profileName))
+		content.WriteString(fmt.Sprintf("sso_session = %s\n", sessionName))
+		content.WriteString(fmt.Sprintf("sso_account_id = %s\n", sec.AWSAccount))
 		content.WriteString(fmt.Sprintf("sso_role_name = %s\n", ssoRoleName))
 		content.WriteString(fmt.Sprintf("region = %s\n", config.Infrastructure.Region))
 		content.WriteString("output = json\n")

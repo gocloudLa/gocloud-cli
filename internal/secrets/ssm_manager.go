@@ -49,6 +49,7 @@ var validLayerTypes = map[string]bool{
 	"base":         true,
 	"foundation":   true,
 	"organization": true,
+	"security":     true,
 	"project":      true,
 	"workload":     true,
 }
@@ -142,9 +143,9 @@ func ParseLayerPath(layerPath string, config *models.Config) (*Layer, error) {
 		LayerType: parts[0],
 	}
 
-	// Single-segment path: only "organization" is valid
+	// Single-segment path: only "organization" or "security" is valid
 	if len(parts) == 1 {
-		if layer.LayerType != "organization" {
+		if layer.LayerType != "organization" && layer.LayerType != "security" {
 			return nil, fmt.Errorf("invalid layer path format: %s. Expected format: layer/environment or layer/project/environment", layerPath)
 		}
 	}
@@ -164,6 +165,15 @@ func ParseLayerPath(layerPath string, config *models.Config) (*Layer, error) {
 			return nil, fmt.Errorf("invalid path for organization layer: %s. Expected: organization", layerPath)
 		}
 		layer.Environment = "org"
+		layer.CommonName = fmt.Sprintf("%s-%s", config.Infrastructure.Company, layer.Environment)
+		layer.SSMParameter = fmt.Sprintf("/terraform/%s-%s", layer.CommonName, layer.LayerType)
+		return layer, nil
+	}
+	if layer.LayerType == "security" {
+		if len(parts) != 1 {
+			return nil, fmt.Errorf("invalid path for security layer: %s. Expected: security", layerPath)
+		}
+		layer.Environment = "sec"
 		layer.CommonName = fmt.Sprintf("%s-%s", config.Infrastructure.Company, layer.Environment)
 		layer.SSMParameter = fmt.Sprintf("/terraform/%s-%s", layer.CommonName, layer.LayerType)
 		return layer, nil

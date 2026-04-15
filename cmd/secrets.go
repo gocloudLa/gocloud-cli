@@ -562,15 +562,19 @@ func getSecretsManagerAndLayer(layerPath string) (*models.Config, secrets.Secret
 }
 
 // parseLayerPathComponents parses layerPath into layerType, project, env. Returns ok=false if invalid.
-// Accepts: "organization" (1 part), "layer/env" (2 parts), "layer/project/env" (3 parts).
+// Accepts: "organization" or "security" (1 part), "layer/env" (2 parts), "layer/project/env" (3 parts).
 func parseLayerPathComponents(layerPath string) (layerType, project, env string, ok bool) {
 	parts := strings.Split(layerPath, "/")
 	switch len(parts) {
 	case 1:
-		if parts[0] != "organization" {
+		switch parts[0] {
+		case "organization":
+			return "organization", "", "org", true
+		case "security":
+			return "security", "", "sec", true
+		default:
 			return "", "", "", false
 		}
-		return "organization", "", "org", true
 	case 2:
 		return parts[0], "", parts[1], true
 	case 3:
@@ -622,6 +626,21 @@ func shouldGenerateSecretsForPath(infra *models.InfrastructureConfig, layerType,
 		// organization-level override (supports enable_secrets: false / true inside infrastructure.organization)
 		if infra.Organization.EnableSecrets != nil {
 			return *infra.Organization.EnableSecrets
+		}
+		if infra.EnableSecrets != nil {
+			return *infra.EnableSecrets
+		}
+		return true
+	}
+	if layerType == "security" {
+		if infra.Security == nil || infra.Security.AWSAccount == "" {
+			return false
+		}
+		if infra.Layers != nil && infra.Layers.Security != nil && !*infra.Layers.Security {
+			return false
+		}
+		if infra.Security.EnableSecrets != nil {
+			return *infra.Security.EnableSecrets
 		}
 		if infra.EnableSecrets != nil {
 			return *infra.EnableSecrets
