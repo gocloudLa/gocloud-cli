@@ -85,16 +85,32 @@ func ValidateConfig(config *Config) error {
 				validationErrors = append(validationErrors, fmt.Sprintf("infrastructure.organization.secrets: %v", err))
 			}
 		}
+		if config.Infrastructure.Security != nil && config.Infrastructure.Security.Secrets != nil {
+			if err := ValidateSecretsConfig(config.Infrastructure.Security.Secrets); err != nil {
+				validationErrors = append(validationErrors, fmt.Sprintf("infrastructure.security.secrets: %v", err))
+			}
+		}
 		// Validate organization: when layers.organization is true, infrastructure.organization with aws_account is required
 		if config.Infrastructure.Layers != nil && config.Infrastructure.Layers.Organization != nil && *config.Infrastructure.Layers.Organization {
 			if config.Infrastructure.Organization == nil || config.Infrastructure.Organization.AWSAccount == "" {
 				validationErrors = append(validationErrors, "organization layer is enabled (layers.organization: true) but infrastructure.organization.aws_account is required for backend, secrets, and SSO")
 			}
 		}
+		// Validate security: when layers.security is true, infrastructure.security with aws_account is required
+		if config.Infrastructure.Layers != nil && config.Infrastructure.Layers.Security != nil && *config.Infrastructure.Layers.Security {
+			if config.Infrastructure.Security == nil || config.Infrastructure.Security.AWSAccount == "" {
+				validationErrors = append(validationErrors, "security layer is enabled (layers.security: true) but infrastructure.security.aws_account is required for backend, secrets, and SSO")
+			}
+		}
 		// Validate organization aws_account if present (used for SSO profile client-org)
 		if config.Infrastructure.Organization != nil && config.Infrastructure.Organization.AWSAccount != "" {
 			if err := validation.ValidateAWSAccountID(config.Infrastructure.Organization.AWSAccount); err != nil {
 				validationErrors = append(validationErrors, fmt.Sprintf("infrastructure.organization.aws_account: %v", err))
+			}
+		}
+		if config.Infrastructure.Security != nil && config.Infrastructure.Security.AWSAccount != "" {
+			if err := validation.ValidateAWSAccountID(config.Infrastructure.Security.AWSAccount); err != nil {
+				validationErrors = append(validationErrors, fmt.Sprintf("infrastructure.security.aws_account: %v", err))
 			}
 		}
 

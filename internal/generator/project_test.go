@@ -1520,6 +1520,41 @@ func TestGetEnabledLayersFromConfig_OrganizationOnlyWhenConfigured(t *testing.T)
 	if !hasOrg {
 		t.Error("GetEnabledLayersFromConfig() must include 'organization' when infrastructure.organization.aws_account is set")
 	}
+
+	configNoSec := &models.Config{
+		Infrastructure: &models.InfrastructureConfig{
+			Client:       "test-client",
+			Company:      "gcl",
+			Region:       "us-east-1",
+			Layers:       &models.LayerConfig{Security: ptrBool(true)},
+			Environments: map[string]models.Environment{},
+		},
+	}
+	for _, l := range GetEnabledLayersFromConfig(configNoSec) {
+		if l == "security" {
+			t.Error("GetEnabledLayersFromConfig() must not include 'security' when infrastructure.security.aws_account is not set")
+		}
+	}
+	configWithSec := &models.Config{
+		Infrastructure: &models.InfrastructureConfig{
+			Client:       "test-client",
+			Company:      "gcl",
+			Region:       "us-east-1",
+			Security:     &models.OrganizationLayerConfig{AWSAccount: "112345678901"},
+			Layers:       &models.LayerConfig{Security: ptrBool(true)},
+			Environments: map[string]models.Environment{},
+		},
+	}
+	hasSec := false
+	for _, l := range GetEnabledLayersFromConfig(configWithSec) {
+		if l == "security" {
+			hasSec = true
+			break
+		}
+	}
+	if !hasSec {
+		t.Error("GetEnabledLayersFromConfig() must include 'security' when infrastructure.security.aws_account is set")
+	}
 }
 
 // TestGenerateOrganization_TerragruntBackendProviders ensures organization layer gets terragrunt.hcl (no deps), backend.tf, providers.tf
@@ -1647,5 +1682,40 @@ func TestGenerateEnvironmentTable_IncludesOrganization(t *testing.T) {
 	}
 	if !strings.Contains(table, "|-------------|") {
 		t.Errorf("generateEnvironmentTable() must produce a table")
+	}
+}
+
+// TestBuildProviderTemplateData_ExplicitProfileNotOverwritten ensures default SSO profile is not applied
+// to aws provider entries that already set profile in YAML (any layer).
+func TestBuildProviderTemplateData_ExplicitProfileNotOverwritten(t *testing.T) {
+	config := &models.InfrastructureConfig{
+		Client:  "demo",
+		Company: "gcl",
+		Region:  "us-east-1",
+		AWSSSO:  &models.SSOConfig{StartURL: "https://x.awsapps.com/start", Region: "us-east-1", RoleName: "Admin"},
+		Security: &models.OrganizationLayerConfig{
+			AWSAccount: "909317185729",
+			Providers: &models.ProviderConfig{
+				DefaultProviders: []models.ProviderSpec{
+					{Name: "aws", Region: "local.metadata.aws_region"},
+					{Name: "aws", Alias: "log", Region: "local.metadata.aws_region", Profile: "demosecurity-log"},
+					{Name: "aws", Alias: "kms", Region: "local.metadata.aws_region", Profile: "demosecurity-sec"},
+				},
+			},
+		},
+	}
+	pg := &ProjectGenerator{config: config}
+	data := pg.buildProviderTemplateData("security", "", "sec")
+	if len(data.Providers) != 3 {
+		t.Fatalf("providers count = %d, want 3", len(data.Providers))
+	}
+	if data.Providers[0].Profile != "demo-sec" {
+		t.Errorf("provider[0] profile = %q, want demo-sec (auto when empty)", data.Providers[0].Profile)
+	}
+	if data.Providers[1].Profile != "demosecurity-log" {
+		t.Errorf("provider[1] profile = %q, want demosecurity-log", data.Providers[1].Profile)
+	}
+	if data.Providers[2].Profile != "demosecurity-sec" {
+		t.Errorf("provider[2] profile = %q, want demosecurity-sec", data.Providers[2].Profile)
 	}
 }

@@ -186,6 +186,7 @@ func showDirectoryStructure(config *models.InfrastructureConfig) {
 	utils.PrintText("   ├── project/\n")
 	utils.PrintText("   ├── workload/\n")
 	utils.PrintText("   ├── organization/\n")
+	utils.PrintText("   ├── security/\n")
 	if generator.IsGitignoreGenerationEnabledForConfig(config) {
 		utils.PrintText("   ├── .gitignore\n")
 	}
@@ -350,6 +351,23 @@ func shouldGenerateOrganizationTerragruntForPreview(config *models.Infrastructur
 	return true
 }
 
+func shouldGenerateSecuritySecretsForPreview(config *models.InfrastructureConfig) bool {
+	if config.Security != nil && config.Security.EnableSecrets != nil {
+		return *config.Security.EnableSecrets
+	}
+	if config.EnableSecrets != nil {
+		return *config.EnableSecrets
+	}
+	return true
+}
+
+func shouldGenerateSecurityTerragruntForPreview(config *models.InfrastructureConfig) bool {
+	if config.EnableTerragrunt != nil {
+		return *config.EnableTerragrunt
+	}
+	return true
+}
+
 func showFilesToGenerate(config *models.InfrastructureConfig) {
 	baseDir := generateWorkingDir
 	if baseDir == "." {
@@ -427,6 +445,19 @@ func showFilesToGenerate(config *models.InfrastructureConfig) {
 		utils.PrintText("   %s/organization/providers.tf\n", baseDir)
 		utils.PrintText("   %s/organization/backend.tf\n", baseDir)
 	}
+
+	if generator.IsSecurityLayerEnabledForConfig(config) {
+		utils.PrintText("   %s/security/main.tf\n", baseDir)
+		utils.PrintText("   %s/security/metadata.tf\n", baseDir)
+		if shouldGenerateSecuritySecretsForPreview(config) {
+			utils.PrintText("   %s/security/_secrets.tf\n", baseDir)
+		}
+		if shouldGenerateSecurityTerragruntForPreview(config) {
+			utils.PrintText("   %s/security/terragrunt.hcl\n", baseDir)
+		}
+		utils.PrintText("   %s/security/providers.tf\n", baseDir)
+		utils.PrintText("   %s/security/backend.tf\n", baseDir)
+	}
 }
 
 func showGenerationSummary(config *models.Config, workingDir string) {
@@ -471,6 +502,9 @@ func showGenerationSummary(config *models.Config, workingDir string) {
 	if shouldGenerateLayerForSummary(config, "organization", "") {
 		utils.PrintText("   organization/\n")
 	}
+	if shouldGenerateLayerForSummary(config, "security", "") {
+		utils.PrintText("   security/\n")
+	}
 
 	utils.PrintInfo("\n📋 Next Steps:")
 	utils.PrintText("  1. Review the generated configuration files\n")
@@ -496,6 +530,9 @@ func shouldGenerateLayerForSummary(config *models.Config, layerType, envKey stri
 	// Organization requires infrastructure.organization.aws_account (same as generator)
 	if layerType == "organization" {
 		return config.Infrastructure != nil && generator.IsOrganizationLayerEnabledForConfig(config.Infrastructure)
+	}
+	if layerType == "security" {
+		return config.Infrastructure != nil && generator.IsSecurityLayerEnabledForConfig(config.Infrastructure)
 	}
 
 	// Get environment configuration
@@ -538,6 +575,10 @@ func getLayerDefaultForSummary(config *models.Config, layerType string) bool {
 		case "organization":
 			if config.Infrastructure.Layers.Organization != nil {
 				return *config.Infrastructure.Layers.Organization
+			}
+		case "security":
+			if config.Infrastructure.Layers.Security != nil {
+				return *config.Infrastructure.Layers.Security
 			}
 		}
 	}

@@ -50,6 +50,7 @@ func (te *TemplateEngine) loadTemplates() {
 	te.templates["main.tf.project.tpl"] = template.Must(template.New("main.tf.project").Parse(mainProjectTemplate))
 	te.templates["main.tf.workload.tpl"] = template.Must(template.New("main.tf.workload").Parse(mainWorkloadTemplate))
 	te.templates["main.tf.organization.tpl"] = template.Must(template.New("main.tf.organization").Parse(mainOrganizationTemplate))
+	te.templates["main.tf.security.tpl"] = template.Must(template.New("main.tf.security").Parse(mainSecurityTemplate))
 
 	// Provider and backend templates
 	te.templates["providers.tf.tpl"] = template.Must(template.New("providers.tf").Parse(providersTemplate))
@@ -261,6 +262,29 @@ module "organization" {
   source  = "gocloudLa/standard-platform/aws//modules/organization"
   version = "{{.Version}}"
   {{end}}
+
+}
+`
+
+const mainSecurityTemplate = `# =============================================================================
+# This file is generated and maintained by GoCloud CLI
+# You CAN edit this file manually to add your custom configuration
+# GoCloud CLI will only update the module version when needed
+# =============================================================================
+
+module "security" {
+{{- if .IsGitSource }}
+  source = "{{.Source}}//modules/security?ref={{.SourceRef}}"
+{{else}}
+  source  = "gocloudLa/standard-platform/aws//modules/security"
+  version = "{{.Version}}"
+{{end}}
+  providers = {
+    aws.org = aws.org
+    aws.sec = aws.sec
+    aws.log = aws.log
+    aws.kms = aws.kms
+  }
 
 }
 `

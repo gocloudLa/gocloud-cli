@@ -106,13 +106,19 @@ func (m *SOPSManager) getRegionForEnvironment(envKey string) string {
 }
 
 // getAccountForEnvironment returns AWS account ID and display name for an env key.
-// For "org" (organization layer) uses infrastructure.organization.aws_account; otherwise Environments[envKey].
+// For "org" / "sec" uses infrastructure.organization / infrastructure.security aws_account; otherwise Environments[envKey].
 func (m *SOPSManager) getAccountForEnvironment(envKey string) (accountID, displayName string, err error) {
 	if envKey == "org" {
 		if m.config.Infrastructure.Organization == nil || m.config.Infrastructure.Organization.AWSAccount == "" {
 			return "", "", fmt.Errorf("organization layer not configured (missing infrastructure.organization.aws_account)")
 		}
 		return m.config.Infrastructure.Organization.AWSAccount, "Organization", nil
+	}
+	if envKey == "sec" {
+		if m.config.Infrastructure.Security == nil || m.config.Infrastructure.Security.AWSAccount == "" {
+			return "", "", fmt.Errorf("security layer not configured (missing infrastructure.security.aws_account)")
+		}
+		return m.config.Infrastructure.Security.AWSAccount, "Security", nil
 	}
 	envConfig, exists := m.config.Infrastructure.Environments[envKey]
 	if !exists {
@@ -364,6 +370,9 @@ func (m *SOPSManager) getSecretsFilePath(layer *Layer) (string, error) {
 	// Organization layer: single directory organization/_secrets.yaml (no env subdir)
 	if layer.LayerType == "organization" {
 		return filepath.Join(m.workingDir, "organization", "_secrets.yaml"), nil
+	}
+	if layer.LayerType == "security" {
+		return filepath.Join(m.workingDir, "security", "_secrets.yaml"), nil
 	}
 
 	// Get environment directory name

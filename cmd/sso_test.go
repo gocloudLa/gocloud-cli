@@ -71,7 +71,7 @@ func TestSSOSetup(t *testing.T) {
 				if err != nil {
 					t.Skipf("Skipping test: example config not found")
 				}
-				_ = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
+				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
 			case "invalid.yaml":
 				err = os.WriteFile(filepath.Join(tempDir, "invalid.yaml"), []byte("invalid: yaml: content: ["), 0644)
 			case "no-sso.yaml":
@@ -176,7 +176,7 @@ func TestSSOList(t *testing.T) {
 				if err != nil {
 					t.Skipf("Skipping test: example config not found")
 				}
-				_ = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
+				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
 			case "invalid.yaml":
 				err = os.WriteFile(filepath.Join(tempDir, "invalid.yaml"), []byte("invalid: yaml: content: ["), 0644)
 			}
@@ -282,7 +282,7 @@ func TestSSOLogin(t *testing.T) {
 				if err != nil {
 					t.Skipf("Skipping test: example config not found")
 				}
-				_ = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
+				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
 				if err != nil {
 					t.Fatalf("Failed to copy example config: %v", err)
 				}
@@ -391,7 +391,7 @@ func TestSSOVerify(t *testing.T) {
 				if err != nil {
 					t.Skipf("Skipping test: example config not found")
 				}
-				_ = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
+				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
 				if err != nil {
 					t.Fatalf("Failed to copy example config: %v", err)
 				}
@@ -491,7 +491,7 @@ func TestSSOCommands(t *testing.T) {
 				if err != nil {
 					t.Skipf("Skipping test: example config not found")
 				}
-				_ = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
+				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
 				if err != nil {
 					t.Fatalf("Failed to copy example config: %v", err)
 				}

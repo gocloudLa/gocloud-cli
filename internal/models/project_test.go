@@ -1599,6 +1599,9 @@ func TestInfrastructureConfig_RegionForEnvironment(t *testing.T) {
 	if got := infra.RegionForEnvironment("org"); got != "us-east-1" {
 		t.Errorf("RegionForEnvironment(org) = %q, want us-east-1", got)
 	}
+	if got := infra.RegionForEnvironment("sec"); got != "us-east-1" {
+		t.Errorf("RegionForEnvironment(sec) = %q, want us-east-1", got)
+	}
 }
 
 func TestGetEnvironmentOrder(t *testing.T) {

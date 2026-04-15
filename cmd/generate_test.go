@@ -136,7 +136,7 @@ func TestGenerateCommand(t *testing.T) {
 				if err != nil {
 					t.Skipf("Skipping test: example config not found")
 				}
-				_ = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
+				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
 				if err != nil {
 					t.Fatalf("Failed to copy example config: %v", err)
 				}
@@ -239,7 +239,7 @@ func TestGenerateWithConfig(t *testing.T) {
 				if err != nil {
 					t.Skipf("Skipping test: example config not found")
 				}
-				_ = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
+				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
 			case "incomplete.yaml":
 				err = os.WriteFile(filepath.Join(tempDir, "incomplete.yaml"), []byte(`
 cli:
@@ -500,6 +500,46 @@ func TestGenerateFlags(t *testing.T) {
 				if err != nil {
 					t.Errorf("SetFlag(%s) expected no error but got: %v", tt.flagName, err)
 				}
+			}
+		})
+	}
+}
+
+func TestIsSecurityLayerEnabledForConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   *models.InfrastructureConfig
+		expected bool
+	}{
+		{
+			name: "security enabled with aws_account",
+			config: &models.InfrastructureConfig{
+				Security: &models.OrganizationLayerConfig{AWSAccount: "123456789012"},
+				Layers:   &models.LayerConfig{Security: &[]bool{true}[0]},
+			},
+			expected: true,
+		},
+		{
+			name: "security disabled explicitly",
+			config: &models.InfrastructureConfig{
+				Security: &models.OrganizationLayerConfig{AWSAccount: "123456789012"},
+				Layers:   &models.LayerConfig{Security: &[]bool{false}[0]},
+			},
+			expected: false,
+		},
+		{
+			name: "layers.security true but no aws_account",
+			config: &models.InfrastructureConfig{
+				Layers: &models.LayerConfig{Security: &[]bool{true}[0]},
+			},
+			expected: false,
+		},
+		{name: "empty", config: &models.InfrastructureConfig{}, expected: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := generator.IsSecurityLayerEnabledForConfig(tt.config); got != tt.expected {
+				t.Errorf("IsSecurityLayerEnabledForConfig() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

@@ -35,7 +35,7 @@ func TestGetAllLayersFromConfig(t *testing.T) {
 		"project/core/prd",
 		"workload/api/dev", "workload/webapp/dev",
 		"workload/api/prd",
-		// organization only when infrastructure.organization.aws_account is set
+		// organization/security only when respective infrastructure.*.aws_account is set
 	}
 
 	if len(layers) != len(expectedLayers) {
@@ -133,6 +133,30 @@ func TestParseLayerPathComponents_Organization(t *testing.T) {
 	}
 	if layerType != "organization" || project != "" || env != "org" {
 		t.Errorf("parseLayerPathComponents(\"organization\") = %q, %q, %q; want organization, \"\", org", layerType, project, env)
+	}
+}
+
+func TestParseLayerPathComponents_Security(t *testing.T) {
+	layerType, project, env, ok := parseLayerPathComponents("security")
+	if !ok {
+		t.Fatal(`parseLayerPathComponents("security") should be valid`)
+	}
+	if layerType != "security" || project != "" || env != "sec" {
+		t.Errorf("parseLayerPathComponents(\"security\") = %q, %q, %q; want security, \"\", sec", layerType, project, env)
+	}
+}
+
+func TestShouldGenerateSecretsForPath_Security(t *testing.T) {
+	infra := &models.InfrastructureConfig{
+		Security:      &models.OrganizationLayerConfig{AWSAccount: "123456789012"},
+		EnableSecrets: ptrBool(true),
+	}
+	if !shouldGenerateSecretsForPath(infra, "security", "", "sec") {
+		t.Error("shouldGenerateSecretsForPath(security) with aws_account set should be true")
+	}
+	infra.Layers = &models.LayerConfig{Security: ptrBool(false)}
+	if shouldGenerateSecretsForPath(infra, "security", "", "sec") {
+		t.Error("shouldGenerateSecretsForPath(security) with layers.security false should be false")
 	}
 }
 

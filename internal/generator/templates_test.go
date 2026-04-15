@@ -29,6 +29,7 @@ func TestNewTemplateEngine(t *testing.T) {
 		"main.tf.project.tpl",
 		"main.tf.workload.tpl",
 		"main.tf.organization.tpl",
+		"main.tf.security.tpl",
 	}
 
 	for _, templateName := range expectedTemplates {
@@ -215,6 +216,22 @@ func TestTemplateEngineRender(t *testing.T) {
 				"module \"organization\" {",
 				"source  = \"gocloudLa/standard-platform/aws//modules/organization\"",
 				"version = \"v1.0.0\"",
+			},
+		},
+		{
+			name:         "render main.tf.security template",
+			templateName: "main.tf.security.tpl",
+			data: &models.TemplateData{
+				Version: "v1.0.0",
+			},
+			expectError: false,
+			expectedContains: []string{
+				"module \"security\" {",
+				"source  = \"gocloudLa/standard-platform/aws//modules/security\"",
+				"version = \"v1.0.0\"",
+				"providers = {",
+				"aws.log = aws.log",
+				"aws.kms = aws.kms",
 			},
 		},
 		{
@@ -497,6 +514,11 @@ func TestTemplateEngineRenderMainTemplates(t *testing.T) {
 			templateName:   "main.tf.organization.tpl",
 			expectedModule: "organization",
 		},
+		{
+			name:           "security template",
+			templateName:   "main.tf.security.tpl",
+			expectedModule: "security",
+		},
 	}
 
 	for _, tt := range tests {
@@ -514,6 +536,13 @@ func TestTemplateEngineRenderMainTemplates(t *testing.T) {
 				"module \"" + tt.expectedModule + "\" {",
 				"source  = \"gocloudLa/standard-platform/aws//modules/" + tt.expectedModule + "\"",
 				"version = \"v1.0.0\"",
+			}
+			if tt.expectedModule == "security" {
+				expectedContent = append(expectedContent,
+					"providers = {",
+					"aws.log = aws.log",
+					"aws.kms = aws.kms",
+				)
 			}
 
 			for _, expected := range expectedContent {

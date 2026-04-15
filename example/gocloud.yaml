@@ -34,6 +34,20 @@ infrastructure:
             role_arn: "arn:aws:iam::123456789012:role/OrganizationAccountAccessRole"
             session_name: "TerraformSession"
         # - name: "gitlab"
+  security:
+    aws_account: "112345678901"   # Required for SSO: creates profile {client}-sec so sso login --all includes it
+    # enable_secrets: true        # (optional) secrets only for security layer (overrides global enable_secrets)
+    providers:
+      default_providers:
+        - name: "aws"
+          region: "local.metadata.aws_region"
+        - name: "aws"
+          alias: "sha"
+          region: "local.metadata.aws_region"
+          assume_role:          
+            role_arn: "arn:aws:iam::123456789012:role/OrganizationAccountAccessRole"
+            session_name: "TerraformSession"
+        # - name: "gitlab"
   #   secrets:
   #     type: "sops"
   #   backend:     # Optional: override backend only for organization/backend.tf (pattern, region, encrypt, etc.)
@@ -47,6 +61,7 @@ infrastructure:
     base: true
     foundation: true
     organization: true
+    security: true
 
   # Default backend settings (commented - uncomment to customize):
   # backend:

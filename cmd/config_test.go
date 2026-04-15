@@ -270,7 +270,7 @@ func TestConfigCommands(t *testing.T) {
 				if err != nil {
 					t.Skipf("Skipping test: example config not found")
 				}
-				_ = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
+				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
 				if err != nil {
 					t.Fatalf("Failed to copy example config: %v", err)
 				}
