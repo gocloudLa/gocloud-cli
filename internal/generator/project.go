@@ -1920,11 +1920,12 @@ func (pg *ProjectGenerator) buildBackendTemplateData(layerType, project, env str
 	// Use configured key template or build default
 	keyTemplate := backendConfig.KeyTemplate
 	if keyTemplate == "" {
-		if layerType == "organization" {
+		switch layerType {
+		case "organization":
 			keyTemplate = fmt.Sprintf("%s/organization/terraform.tfstate", envConfig.AWSAccount)
-		} else if layerType == "security" {
+		case "security":
 			keyTemplate = fmt.Sprintf("%s/security/terraform.tfstate", envConfig.AWSAccount)
-		} else {
+		default:
 			envSeg := models.EnvironmentNameForBackendKey(env, envConfig)
 			keyTemplate = fmt.Sprintf("%s/%s-%s/terraform.tfstate", envConfig.AWSAccount, layerType, envSeg)
 			if project != "" {

@@ -108,11 +108,12 @@ func runHealthCheck(cmd *cobra.Command, _ []string) error {
 	for _, envKey := range envKeys {
 		accountID, ok := accountIDForHealthEnv(config.Infrastructure, envKey)
 		if !ok {
-			if envKey == "org" {
+			switch envKey {
+			case "org":
 				utils.PrintWarning("⚠️  %s: SKIPPED (organization layer not enabled in config)", envKey)
-			} else if envKey == "sec" {
+			case "sec":
 				utils.PrintWarning("⚠️  %s: SKIPPED (security layer not enabled in config)", envKey)
-			} else {
+			default:
 				utils.PrintWarning("⚠️  %s: SKIPPED (environment not found in config)", envKey)
 			}
 			continue
