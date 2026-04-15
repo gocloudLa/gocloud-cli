@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.5...v1.6.0) (2026-04-15)
+
+
+### Features
+
+* **generator:** add global security layer ([#26](https://github.com/gocloudLa/gocloud-cli/issues/26)) ([faf21db](https://github.com/gocloudLa/gocloud-cli/commit/faf21db8cf8df67792a02dd3ce153f7c0f695d56))
+
 ## [1.5.5](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.4...v1.5.5) (2026-04-11)
 
 
