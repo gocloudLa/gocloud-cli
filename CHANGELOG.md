@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.6.0...v1.7.0) (2026-04-18)
+
+
+### Features
+
+* **metadata:** additional overrides levels ([#28](https://github.com/gocloudLa/gocloud-cli/issues/28)) ([bf1b187](https://github.com/gocloudLa/gocloud-cli/commit/bf1b187dd8c9e563543def66a69e76173949f269))
+
+
+### Bug Fixes
+
+* **sso:** sso setup message ([#30](https://github.com/gocloudLa/gocloud-cli/issues/30)) ([faeb97c](https://github.com/gocloudLa/gocloud-cli/commit/faeb97cc212aafe39def89afd8c5b2d0e5d6c642))
+
 ## [1.6.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.5.5...v1.6.0) (2026-04-15)
 
 
