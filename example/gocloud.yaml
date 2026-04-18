@@ -20,8 +20,14 @@ infrastructure:
   # secrets:
   #   type: "ssm"  # or "sops"
   # Optional: organization layer overrides (secrets, providers, backend, SSO for gocloud sso login/setup)
+  metadata:
+    public_domain: "democorp.cloud"
+    private_domain: "democorp.private"
+    internal_domain: "democorp.internal"
   organization:
     aws_account: "112345678900"   # Required for SSO: creates profile {client}-org so sso login --all includes it
+    # metadata:
+    #   private_domain: "org.democorp.private"  # Optional override only for organization metadata.tf
     # enable_secrets: true        # (optional) secrets only for organization (overrides global enable_secrets)
     providers:
       default_providers:
@@ -36,6 +42,8 @@ infrastructure:
         # - name: "gitlab"
   security:
     aws_account: "112345678901"   # Required for SSO: creates profile {client}-sec so sso login --all includes it
+    # metadata:
+    #   private_domain: "sec.democorp.private"  # Optional override only for security metadata.tf
     # enable_secrets: true        # (optional) secrets only for security layer (overrides global enable_secrets)
     providers:
       default_providers:
@@ -102,6 +110,8 @@ infrastructure:
       name: "Shared"
       dir_name: "shared"
       aws_account: "112345678901"
+      # metadata:
+      #   public_domain: "shared.democorp.cloud" # Optional override for this environment layers
       version: 0.2.0
       # Example: environment-level secrets backend override (inherits global if omitted)
       # secrets:
