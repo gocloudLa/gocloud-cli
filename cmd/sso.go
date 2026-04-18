@@ -149,7 +149,13 @@ func runSSOSetup(cmd *cobra.Command, args []string) error {
 
 	utils.PrintSuccess("✅ AWS SSO configuration setup completed!")
 	utils.PrintText("   AWS_CONFIG_FILE: %s\n", awsConfigFile)
-	profileCount := len(config.Infrastructure.Environments)
+	// Match generateAWSConfig: only environments with enable_sso (default true) get a profile.
+	profileCount := 0
+	for _, env := range config.Infrastructure.Environments {
+		if models.ShouldEnableSSO(env) {
+			profileCount++
+		}
+	}
 	if organizationSSOEnabled(config.Infrastructure) {
 		profileCount++
 	}
