@@ -1275,31 +1275,9 @@ func (pg *ProjectGenerator) buildTemplateData(layer, env string) *models.Templat
 	// Resolve backend configuration
 	backendConfig := models.ResolveBackendConfig(pg.config)
 
-	// Process custom metadata for proper alignment
-	var metadataLines []string
-	if pg.config.Metadata != nil {
-		// Get all keys and sort them alphabetically for consistent order
-		var keys []string
-		for key := range pg.config.Metadata {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-
-		// Find the maximum key length for alignment
-		maxKeyLength := 0
-		for _, key := range keys {
-			if len(key) > maxKeyLength {
-				maxKeyLength = len(key)
-			}
-		}
-
-		// Generate aligned lines in alphabetical order
-		for _, key := range keys {
-			value := pg.config.Metadata[key]
-			alignedLine := fmt.Sprintf("    %-*s = \"%s\"", maxKeyLength, key, value)
-			metadataLines = append(metadataLines, alignedLine)
-		}
-	}
+	// Resolve and align custom metadata according to layer/environment hierarchy.
+	resolvedMetadata := pg.config.ResolveMetadata(layer, envKey)
+	metadataLines := pg.buildAlignedMetadataLines(resolvedMetadata)
 
 	// Get region for this environment
 	region = pg.getRegionForEnvironment(envKey)
@@ -1708,31 +1686,9 @@ func (pg *ProjectGenerator) buildProjectTemplateData(layerType string, item inte
 	// Resolve backend configuration
 	backendConfig := models.ResolveBackendConfig(pg.config)
 
-	// Process custom metadata for proper alignment
-	var metadataLines []string
-	if pg.config.Metadata != nil {
-		// Get all keys and sort them alphabetically for consistent order
-		var keys []string
-		for key := range pg.config.Metadata {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-
-		// Find the maximum key length for alignment
-		maxKeyLength := 0
-		for _, key := range keys {
-			if len(key) > maxKeyLength {
-				maxKeyLength = len(key)
-			}
-		}
-
-		// Generate aligned lines in alphabetical order
-		for _, key := range keys {
-			value := pg.config.Metadata[key]
-			alignedLine := fmt.Sprintf("    %-*s = \"%s\"", maxKeyLength, key, value)
-			metadataLines = append(metadataLines, alignedLine)
-		}
-	}
+	// Resolve and align custom metadata according to layer/environment hierarchy.
+	resolvedMetadata := pg.config.ResolveMetadata(layerType, envKey)
+	metadataLines := pg.buildAlignedMetadataLines(resolvedMetadata)
 
 	// Get region for this environment
 	region = pg.getRegionForEnvironment(envKey)
@@ -2799,4 +2755,33 @@ func (pg *ProjectGenerator) generateCommandExamples() string {
 	}
 
 	return examples.String()
+}
+
+// buildAlignedMetadataLines renders deterministic, aligned metadata lines for metadata.tf.
+func (pg *ProjectGenerator) buildAlignedMetadataLines(customMetadata map[string]interface{}) []string {
+	if len(customMetadata) == 0 {
+		return nil
+	}
+
+	var keys []string
+	for key := range customMetadata {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	maxKeyLength := 0
+	for _, key := range keys {
+		if len(key) > maxKeyLength {
+			maxKeyLength = len(key)
+		}
+	}
+
+	metadataLines := make([]string, 0, len(keys))
+	for _, key := range keys {
+		value := customMetadata[key]
+		alignedLine := fmt.Sprintf("    %-*s = \"%s\"", maxKeyLength, key, value)
+		metadataLines = append(metadataLines, alignedLine)
+	}
+
+	return metadataLines
 }

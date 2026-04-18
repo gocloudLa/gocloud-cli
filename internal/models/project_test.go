@@ -1,6 +1,7 @@
 package models
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -1461,6 +1462,107 @@ func TestResolveProviderConfigOrganizationLayer(t *testing.T) {
 	}
 	if got.AssumeRole.RoleARN != "arn:aws:iam::904233109008:role/OrganizationAccountAccessRole" {
 		t.Errorf("AssumeRole.RoleARN = %q", got.AssumeRole.RoleARN)
+	}
+}
+
+func TestResolveMetadata(t *testing.T) {
+	config := &InfrastructureConfig{
+		Metadata: map[string]interface{}{
+			"global":         "yes",
+			"shared_value":   "global",
+			"global_only":    "global-only",
+			"override_chain": "global",
+		},
+		Organization: &OrganizationLayerConfig{
+			AWSAccount: "123456789012",
+			Metadata: map[string]interface{}{
+				"org_only":       "org",
+				"shared_value":   "organization",
+				"override_chain": "organization",
+			},
+		},
+		Security: &OrganizationLayerConfig{
+			AWSAccount: "123456789013",
+			Metadata: map[string]interface{}{
+				"sec_only":       "sec",
+				"shared_value":   "security",
+				"override_chain": "security",
+			},
+		},
+		Environments: map[string]Environment{
+			"dev": {
+				AWSAccount: "123456789014",
+				Metadata: map[string]interface{}{
+					"env_only":       "dev",
+					"shared_value":   "environment",
+					"override_chain": "environment",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		layer    string
+		envKey   string
+		expected map[string]interface{}
+	}{
+		{
+			name:   "organization metadata overrides global",
+			layer:  "organization",
+			envKey: "org",
+			expected: map[string]interface{}{
+				"global":         "yes",
+				"global_only":    "global-only",
+				"shared_value":   "organization",
+				"override_chain": "organization",
+				"org_only":       "org",
+			},
+		},
+		{
+			name:   "security metadata overrides global",
+			layer:  "security",
+			envKey: "sec",
+			expected: map[string]interface{}{
+				"global":         "yes",
+				"global_only":    "global-only",
+				"shared_value":   "security",
+				"override_chain": "security",
+				"sec_only":       "sec",
+			},
+		},
+		{
+			name:   "environment metadata overrides global",
+			layer:  "base",
+			envKey: "dev",
+			expected: map[string]interface{}{
+				"global":         "yes",
+				"global_only":    "global-only",
+				"shared_value":   "environment",
+				"override_chain": "environment",
+				"env_only":       "dev",
+			},
+		},
+		{
+			name:   "global metadata for unknown environment",
+			layer:  "foundation",
+			envKey: "missing",
+			expected: map[string]interface{}{
+				"global":         "yes",
+				"global_only":    "global-only",
+				"shared_value":   "global",
+				"override_chain": "global",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := config.ResolveMetadata(tt.layer, tt.envKey)
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("ResolveMetadata(%q, %q) = %#v, want %#v", tt.layer, tt.envKey, got, tt.expected)
+			}
+		})
 	}
 }
 

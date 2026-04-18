@@ -730,6 +730,166 @@ func TestBuildProjectTemplateData(t *testing.T) {
 	}
 }
 
+func TestBuildTemplateData_MetadataHierarchy(t *testing.T) {
+	config := &models.InfrastructureConfig{
+		Client:  "test-client",
+		Company: "gcl",
+		Region:  "us-east-1",
+		Version: "v1.0.0",
+		Metadata: map[string]interface{}{
+			"a": "global-a",
+			"z": "global-z",
+		},
+		Organization: &models.OrganizationLayerConfig{
+			AWSAccount: "123456789012",
+			Metadata: map[string]interface{}{
+				"b": "org-b",
+				"z": "org-z",
+			},
+		},
+		Security: &models.OrganizationLayerConfig{
+			AWSAccount: "123456789013",
+			Metadata: map[string]interface{}{
+				"b": "sec-b",
+				"z": "sec-z",
+			},
+		},
+		Environments: map[string]models.Environment{
+			"dev": {
+				Name:       "Development",
+				AWSAccount: "123456789014",
+				Metadata: map[string]interface{}{
+					"b": "env-b",
+					"z": "env-z",
+				},
+			},
+		},
+	}
+
+	generator := &ProjectGenerator{config: config}
+
+	tests := []struct {
+		name     string
+		layer    string
+		env      string
+		expected []string
+	}{
+		{
+			name:  "organization metadata overrides global",
+			layer: "organization",
+			env:   "",
+			expected: []string{
+				"    a = \"global-a\"",
+				"    b = \"org-b\"",
+				"    z = \"org-z\"",
+			},
+		},
+		{
+			name:  "security metadata overrides global",
+			layer: "security",
+			env:   "",
+			expected: []string{
+				"    a = \"global-a\"",
+				"    b = \"sec-b\"",
+				"    z = \"sec-z\"",
+			},
+		},
+		{
+			name:  "environment metadata overrides global",
+			layer: "base",
+			env:   "dev",
+			expected: []string{
+				"    a = \"global-a\"",
+				"    b = \"env-b\"",
+				"    z = \"env-z\"",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generator.buildTemplateData(tt.layer, tt.env)
+			if len(result.MetadataLines) != len(tt.expected) {
+				t.Fatalf("buildTemplateData() MetadataLines length = %d, expected %d", len(result.MetadataLines), len(tt.expected))
+			}
+			for i := range tt.expected {
+				if result.MetadataLines[i] != tt.expected[i] {
+					t.Errorf("buildTemplateData() MetadataLines[%d] = %q, expected %q", i, result.MetadataLines[i], tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
+func TestBuildProjectTemplateData_MetadataHierarchy(t *testing.T) {
+	config := &models.InfrastructureConfig{
+		Client:  "test-client",
+		Company: "gcl",
+		Region:  "us-east-1",
+		Version: "v1.0.0",
+		Metadata: map[string]interface{}{
+			"a": "global-a",
+			"z": "global-z",
+		},
+		Environments: map[string]models.Environment{
+			"dev": {
+				Name:       "Development",
+				AWSAccount: "123456789012",
+				Metadata: map[string]interface{}{
+					"b": "env-b",
+					"z": "env-z",
+				},
+				Projects:  []interface{}{"core"},
+				Workloads: []interface{}{"api"},
+			},
+		},
+	}
+
+	generator := &ProjectGenerator{config: config}
+
+	tests := []struct {
+		name      string
+		layerType string
+		item      interface{}
+		expected  []string
+	}{
+		{
+			name:      "project layer uses environment metadata override",
+			layerType: "project",
+			item:      "core",
+			expected: []string{
+				"    a = \"global-a\"",
+				"    b = \"env-b\"",
+				"    z = \"env-z\"",
+			},
+		},
+		{
+			name:      "workload layer uses environment metadata override",
+			layerType: "workload",
+			item:      "api",
+			expected: []string{
+				"    a = \"global-a\"",
+				"    b = \"env-b\"",
+				"    z = \"env-z\"",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generator.buildProjectTemplateData(tt.layerType, tt.item, "dev")
+			if len(result.MetadataLines) != len(tt.expected) {
+				t.Fatalf("buildProjectTemplateData() MetadataLines length = %d, expected %d", len(result.MetadataLines), len(tt.expected))
+			}
+			for i := range tt.expected {
+				if result.MetadataLines[i] != tt.expected[i] {
+					t.Errorf("buildProjectTemplateData() MetadataLines[%d] = %q, expected %q", i, result.MetadataLines[i], tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
 func TestGetDirectoryName(t *testing.T) {
 	config := &models.InfrastructureConfig{
 		Environments: map[string]models.Environment{

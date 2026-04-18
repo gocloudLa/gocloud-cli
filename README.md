@@ -265,7 +265,7 @@ GoCloud uses a single YAML file to define your project: client name, AWS account
 | Version | ✓ | ✓ | — | — |
 | Source | ✓ | ✓ | — | — |
 | Layers | ✓ | ✓ (base, foundation only) | — | — |
-| Metadata | ✓ | — | — | — |
+| Metadata | ✓ | ✓ | — | — |
 
 ### General structure
 
@@ -321,6 +321,7 @@ infrastructure:
   #   security: true               # (default)
 
   # Custom metadata (optional): injected into every metadata.tf.
+  # Default/fallback for all layers unless a more specific metadata is set.
   # metadata:
   #   public_domain: "gocloud.la"
   #   private_domain: "gocloud.private"
@@ -351,6 +352,7 @@ infrastructure:
   # Optional: organization layer + SSO profile {client}-org (uncomment to enable)
   organization:
     aws_account: "123456789012"   # Required for SSO: creates profile {client}-org
+  #   metadata: {}                # (optional) metadata override for organization layer
   #   enable_secrets: true        # (optional) secrets only for organization (overrides global enable_secrets)
   #   aws_sso:                    # (optional) override SSO for org profile
   #     start_url: "https://..."
@@ -363,6 +365,7 @@ infrastructure:
   # Optional: security layer (global) + SSO profile {client}-sec — same fields as organization, dir security/, module //modules/security; generated main.tf wires aws.log and aws.kms into the module (override in main.tf if you use other aliases)
   # security:
   #   aws_account: "123456789013"
+  #   metadata: {}                # (optional) metadata override for security layer
 
   # Environments: each key is an environment (shared, dev, production, etc.). Required: aws_account per env.
   environments:
@@ -381,6 +384,7 @@ infrastructure:
       # aws_sso:                  # (optional) override start_url / role_name for this env
       #   start_url: "https://..."
       #   role_name: "Admin"
+      # metadata: {}              # (optional) metadata override for this environment
       # secrets: { type: "ssm" }  # (optional) backend for this env
       projects: ["core", "common"]   # Project subdirs (e.g. project/core/shared)
       workloads: ["webapp", "api"]   # Workload subdirs (e.g. workload/webapp/shared)
@@ -638,7 +642,13 @@ infrastructure:
 
 ### Custom metadata
 
-Optional key-value pairs (e.g. domain names, team) injected into every `metadata.tf`. Default: none. **Override levels:** see table above (Infrastructure only).
+Optional key-value pairs (e.g. domain names, team) injected into every `metadata.tf`.
+
+Priority (more specific wins):
+- `infrastructure.organization.metadata` for the `organization` layer
+- `infrastructure.security.metadata` for the `security` layer
+- `infrastructure.environments.<env>.metadata` for env-based layers (`base`, `foundation`, `project`, `workload`)
+- `infrastructure.metadata` as global fallback
 
 **Example:**
 
@@ -651,6 +661,22 @@ infrastructure:
     company_email: "devops@gocloud.la"
     support_team: "platform"
     # any_other_key: "value"   # add any key-value pairs you need
+
+  organization:
+    aws_account: "123456789012"
+    metadata:
+      support_team: "platform-org" # overrides global for organization layer only
+
+  security:
+    aws_account: "123456789013"
+    metadata:
+      support_team: "platform-sec" # overrides global for security layer only
+
+  environments:
+    dev:
+      aws_account: "111111111111"
+      metadata:
+        support_team: "platform-dev" # overrides global for dev env layers
 ```
 
 ---

@@ -25,6 +25,7 @@ type OrganizationLayerConfig struct {
 	Secrets       *SecretsConfig               `json:"secrets" yaml:"secrets,omitempty"`
 	Providers     *ProviderConfig              `json:"providers" yaml:"providers,omitempty"` // default_providers (e.g. with assume_role) for organization/providers.tf
 	Backend       *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`     // optional backend override for organization/backend.tf
+	Metadata      map[string]interface{}       `json:"metadata" yaml:"metadata,omitempty"`
 	EnableSecrets *bool                        `json:"enable_secrets" yaml:"enable_secrets,omitempty"`
 	AWSAccount    string                       `json:"aws_account" yaml:"aws_account,omitempty"` // AWS account ID for organization (SSO profile client-org)
 	AWSSSO        *SSOConfig                   `json:"aws_sso" yaml:"aws_sso,omitempty"`         // Optional SSO overrides for organization profile
@@ -90,21 +91,22 @@ type WorkloadItem struct {
 
 // Environment represents an environment configuration
 type Environment struct {
-	Name             string        `json:"name" yaml:"name"`
-	DirName          string        `json:"dir_name" yaml:"dir_name,omitempty"`
-	AWSAccount       string        `json:"aws_account" yaml:"aws_account"`
-	Region           string        `json:"region" yaml:"region,omitempty"`
-	Version          string        `json:"version" yaml:"version,omitempty"`
-	Source           string        `json:"source" yaml:"source,omitempty"`
-	SourceRef        string        `json:"source_ref" yaml:"source_ref,omitempty"`
-	EnableSecrets    *bool         `json:"enable_secrets" yaml:"enable_secrets,omitempty"`
-	EnableTerragrunt *bool         `json:"enable_terragrunt" yaml:"enable_terragrunt,omitempty"`
-	EnableSSO        *bool         `json:"enable_sso" yaml:"enable_sso,omitempty"`
-	Layers           *LayerConfig  `json:"layers" yaml:"layers,omitempty"`
-	AWSSSO           *SSOConfig    `json:"aws_sso" yaml:"aws_sso,omitempty"`
-	Projects         []interface{} `json:"projects" yaml:"projects"`
-	Workloads        []interface{} `json:"workloads" yaml:"workloads"`
-	DependsOn        []string      `json:"depends_on" yaml:"depends_on,omitempty"`
+	Name             string                 `json:"name" yaml:"name"`
+	DirName          string                 `json:"dir_name" yaml:"dir_name,omitempty"`
+	AWSAccount       string                 `json:"aws_account" yaml:"aws_account"`
+	Region           string                 `json:"region" yaml:"region,omitempty"`
+	Metadata         map[string]interface{} `json:"metadata" yaml:"metadata,omitempty"`
+	Version          string                 `json:"version" yaml:"version,omitempty"`
+	Source           string                 `json:"source" yaml:"source,omitempty"`
+	SourceRef        string                 `json:"source_ref" yaml:"source_ref,omitempty"`
+	EnableSecrets    *bool                  `json:"enable_secrets" yaml:"enable_secrets,omitempty"`
+	EnableTerragrunt *bool                  `json:"enable_terragrunt" yaml:"enable_terragrunt,omitempty"`
+	EnableSSO        *bool                  `json:"enable_sso" yaml:"enable_sso,omitempty"`
+	Layers           *LayerConfig           `json:"layers" yaml:"layers,omitempty"`
+	AWSSSO           *SSOConfig             `json:"aws_sso" yaml:"aws_sso,omitempty"`
+	Projects         []interface{}          `json:"projects" yaml:"projects"`
+	Workloads        []interface{}          `json:"workloads" yaml:"workloads"`
+	DependsOn        []string               `json:"depends_on" yaml:"depends_on,omitempty"`
 	// New provider and backend configuration
 	Providers *ProviderConfig              `json:"providers" yaml:"providers,omitempty"`
 	Backend   *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`
@@ -1519,6 +1521,52 @@ func mergeProviderConfigs(base, override *ProviderConfig) *ProviderConfig {
 		if override.ProjectOverrides != nil {
 			result.ProjectOverrides = override.ProjectOverrides
 		}
+	}
+
+	return result
+}
+
+func mergeMetadataMaps(base, override map[string]interface{}) map[string]interface{} {
+	if len(base) == 0 && len(override) == 0 {
+		return nil
+	}
+
+	result := make(map[string]interface{}, len(base)+len(override))
+	for key, value := range base {
+		result[key] = value
+	}
+	for key, value := range override {
+		result[key] = value
+	}
+
+	return result
+}
+
+// ResolveMetadata resolves custom metadata with hierarchy.
+// Priority: organization/security override > environment override > global infrastructure metadata.
+func (config *InfrastructureConfig) ResolveMetadata(layerType, envKey string) map[string]interface{} {
+	if config == nil {
+		return nil
+	}
+
+	result := mergeMetadataMaps(nil, config.Metadata)
+
+	if layerType == "organization" {
+		if config.Organization != nil {
+			result = mergeMetadataMaps(result, config.Organization.Metadata)
+		}
+		return result
+	}
+
+	if layerType == "security" {
+		if config.Security != nil {
+			result = mergeMetadataMaps(result, config.Security.Metadata)
+		}
+		return result
+	}
+
+	if envConfig, exists := config.Environments[envKey]; exists {
+		result = mergeMetadataMaps(result, envConfig.Metadata)
 	}
 
 	return result
