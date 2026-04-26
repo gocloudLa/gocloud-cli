@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.7.0...v1.8.0) (2026-04-26)
+
+
+### Features
+
+* **backend:** add use_assume_role and use_lock_table overrides ([#31](https://github.com/gocloudLa/gocloud-cli/issues/31)) ([62a0582](https://github.com/gocloudLa/gocloud-cli/commit/62a058238b4137848a511f6d9cbd08350c5836bc))
+
 ## [1.7.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.6.0...v1.7.0) (2026-04-18)
 
 
