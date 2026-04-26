@@ -1,0 +1,79 @@
+---
+description: GoCloud CLI — conventions and working guidelines for developing the gocloud Go CLI.
+alwaysApply: true
+---
+
+# GoCloud CLI - Cursor Rules
+
+These rules define **how to work in this repo**. For behavior, flags, schema,
+and current product contract, use `README.md` as source of truth.
+
+## Project at a glance
+
+- Go CLI (`gocloud`) for scaffolding/maintaining Terraform/Terragrunt project
+  structure (organization/security/base/foundation/project/workload).
+- Generates files/dirs, validates YAML, manages secrets (SSM or SOPS+KMS),
+  and configures AWS SSO profiles.
+- Must **not** execute Terraform/Terragrunt operations.
+- Main stack: Go, Cobra, Viper, promptui, yaml.v3, AWS SDK v2.
+
+## ⚠️ Mandatory after every code change
+
+- Always run and pass: `make build` and `make test`.
+- If applicable, also run `make fmt` and `make lint` (or `make pre-commit`).
+- Add/update tests for behavior changes (`*_test.go` in same package).
+- If user-visible behavior changes, update `README.md` in same change.
+- If YAML schema changes, update `internal/models`, validation, and
+  `example/gocloud.yaml` together.
+
+## Codebase layout (mental model)
+
+- `cmd/`: Cobra wiring only; no business logic.
+- `internal/`: business logic (`models`, `config`, `generator`, `secrets`,
+  `validation`, `utils`, `templates`, `logger`, `testutils`).
+- `main.go`: thin entry point calling `cmd.Execute()`.
+- `example/gocloud.yaml`: canonical valid sample.
+
+## Core working principles
+
+- Reuse existing helpers; do not duplicate validation/config/AWS handling.
+- Keep boundaries clean (`cmd` -> `internal`, never inverse).
+- Preserve backward compatibility for YAML and generated outputs.
+- Keep generation idempotent and safe by default (`--force` for overrides).
+- Respect override hierarchy (Infra -> Env -> Project -> Workload).
+- New YAML fields require validation and documentation updates.
+- Keep stable canonical identifiers (`key`) for external/shared resources.
+
+## Go conventions
+
+- Follow idiomatic Go (`gofmt`, wrapped errors, doc comments for exported ids).
+- Return errors; avoid `os.Exit` outside top-level command runner.
+- Use `internal/logger` for diagnostics; avoid ad hoc prints.
+- Prefer stdlib and existing dependencies before adding new ones.
+
+## Testing
+
+- Keep tests near code and prefer table-driven style for multi-case logic.
+- Tests must be hermetic: no network, no real AWS, writes only in `t.TempDir()`.
+- For AWS behavior, use/extend `internal/testutils` mocks.
+
+## CLI / UX conventions
+
+- Reuse existing flag naming conventions.
+- For long/destructive operations, support `--dry-run` when applicable.
+- Keep interactive + non-interactive flows working (prompts + flags/config).
+- Surface actionable user errors (problem + likely fix).
+
+## Documentation discipline
+
+- Keep `README.md` as the user contract and update it with behavior changes.
+- Avoid ad-hoc top-level docs unless explicitly requested.
+- Prefer comments that explain *why*, not obvious *what*.
+
+## What to avoid
+
+- Business logic in `cmd/`.
+- Duplicate implementations of validation/config/AWS handling.
+- Silent changes in generated format/defaults/precedence.
+- Hardcoded org/account/region/client values in code/templates.
+- Schema breaks without synchronized model/validation/example/README updates.

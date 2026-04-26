@@ -1827,24 +1827,30 @@ func (pg *ProjectGenerator) buildBackendTemplateData(layerType, project, env str
 		backendAccountID = backendEnv.AWSAccount
 	}
 
-	// Build assume role ARN
-	assumeRole := &models.AssumeRoleConfig{}
-
-	// Check if there's a custom role template in backend configuration
-	if backendConfig.RoleTemplate != "" {
-		// Use custom role template
-		roleName := pg.processRoleTemplate(backendConfig.RoleTemplate, layerType, project, env, envConfig, backendAccountID)
-		assumeRole.RoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s",
-			backendAccountID, // Account where state is stored
-			roleName)
-	} else {
-		// Use default pattern for general cases (restored original pattern)
-		assumeRole.RoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s-%s-%s-%s",
-			backendAccountID, // Account where state is stored (e.g., "inf")
-			pg.config.Company,
-			backendConfig.Account,
-			backendConfig.Pattern,
-			envConfig.AWSAccount) // Account of current environment
+	// Build assume role ARN (enabled by default).
+	useAssumeRole := true
+	if backendConfig.UseAssumeRole != nil {
+		useAssumeRole = *backendConfig.UseAssumeRole
+	}
+	var assumeRole *models.AssumeRoleConfig
+	if useAssumeRole {
+		assumeRole = &models.AssumeRoleConfig{}
+		// Check if there's a custom role template in backend configuration
+		if backendConfig.RoleTemplate != "" {
+			// Use custom role template
+			roleName := pg.processRoleTemplate(backendConfig.RoleTemplate, layerType, project, env, envConfig, backendAccountID)
+			assumeRole.RoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s",
+				backendAccountID, // Account where state is stored
+				roleName)
+		} else {
+			// Use default pattern for general cases (restored original pattern)
+			assumeRole.RoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s-%s-%s-%s",
+				backendAccountID, // Account where state is stored (e.g., "inf")
+				pg.config.Company,
+				backendConfig.Account,
+				backendConfig.Pattern,
+				envConfig.AWSAccount) // Account of current environment
+		}
 	}
 
 	// Add profile if enabled
@@ -1865,6 +1871,13 @@ func (pg *ProjectGenerator) buildBackendTemplateData(layerType, project, env str
 	dynamoDBTable := backendConfig.DynamoDBTableName
 	if dynamoDBTable == "" {
 		dynamoDBTable = fmt.Sprintf("%s-%s-%s", pg.config.Company, backendConfig.Account, backendConfig.Pattern)
+	}
+	useLockTable := true
+	if backendConfig.UseLockTable != nil {
+		useLockTable = *backendConfig.UseLockTable
+	}
+	if !useLockTable {
+		dynamoDBTable = ""
 	}
 
 	// Use configured backend type or default to "s3"

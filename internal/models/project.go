@@ -846,10 +846,12 @@ type BackendInfrastructureConfig struct {
 	BucketName        string `json:"bucket_name" yaml:"bucket_name,omitempty"`
 	DynamoDBTableName string `json:"dynamodb_table_name" yaml:"dynamodb_table_name,omitempty"`
 	// New features
-	Type         string `json:"type" yaml:"type,omitempty"`                   // "s3" (default)
-	KeyTemplate  string `json:"key_template" yaml:"key_template,omitempty"`   // Template for S3 key
-	RoleTemplate string `json:"role_template" yaml:"role_template,omitempty"` // Template for role name
-	UseProfile   *bool  `json:"use_profile" yaml:"use_profile,omitempty"`     // Control profiles
+	Type          string `json:"type" yaml:"type,omitempty"`                               // "s3" (default)
+	KeyTemplate   string `json:"key_template" yaml:"key_template,omitempty"`               // Template for S3 key
+	RoleTemplate  string `json:"role_template" yaml:"role_template,omitempty"`             // Template for role name
+	UseProfile    *bool  `json:"use_profile" yaml:"use_profile,omitempty"`                 // Control profiles
+	UseAssumeRole *bool  `json:"use_assume_role" yaml:"use_assume_role,omitempty"`         // Control backend assume_role block generation
+	UseLockTable  *bool  `json:"use_lock_table" yaml:"use_lock_table,omitempty"`           // Control backend dynamodb_table generation
 }
 
 // ProviderAssumeRole represents assume_role block for a provider (e.g. AWS cross-account)
@@ -1315,6 +1317,12 @@ func mapToBackendConfig(m interface{}) *BackendInfrastructureConfig {
 	if v, ok := vm["use_profile"].(bool); ok {
 		out.UseProfile = &v
 	}
+	if v, ok := vm["use_assume_role"].(bool); ok {
+		out.UseAssumeRole = &v
+	}
+	if v, ok := vm["use_lock_table"].(bool); ok {
+		out.UseLockTable = &v
+	}
 	return out
 }
 
@@ -1492,6 +1500,12 @@ func mergeBackendInfrastructureConfigs(base, override *BackendInfrastructureConf
 		}
 		if override.UseProfile != nil {
 			result.UseProfile = override.UseProfile
+		}
+		if override.UseAssumeRole != nil {
+			result.UseAssumeRole = override.UseAssumeRole
+		}
+		if override.UseLockTable != nil {
+			result.UseLockTable = override.UseLockTable
 		}
 	}
 

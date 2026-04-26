@@ -302,6 +302,8 @@ infrastructure:
     # encrypt: true              # (default)
     # type: "s3"                 # (default)
     # use_profile: true          # (default)
+    # use_assume_role: true      # (default) set false to omit assume_role block
+    # use_lock_table: true       # (default) set false to omit dynamodb_table
     # key_template: "..."        # (optional) Custom state path
     # role_template: "..."       # (optional) Custom assume_role name
     # bucket_name: "custom-bucket"        # Custom bucket (optional; default: {company}-{account}-{pattern})
@@ -683,7 +685,83 @@ infrastructure:
 
 ### Backend
 
-GoCloud generates `backend.tf` (Terraform state: S3 + DynamoDB). If you omit `backend:`, defaults are used: `pattern: "s3-backend"`, `region` from infrastructure, `account: "sha"`, `encrypt: true`, `type: "s3"`, `use_profile: true`. Bucket and table names default to `{company}-{account}-{pattern}`. **Override levels:** see table above.
+GoCloud generates `backend.tf` (Terraform state in S3, lock table in DynamoDB). **Override levels:** see table above.
+
+If you omit `backend:`, GoCloud uses:
+- `type: "s3"`
+- `pattern: "s3-backend"`
+- `region`: `infrastructure.region`
+- `account: "sha"`
+- `encrypt: true`
+- `use_profile: true`
+- `use_assume_role: true`
+- `use_lock_table: true`
+
+Name defaults:
+- S3 bucket: `{company}-{account}-{pattern}`
+- DynamoDB table: `{company}-{account}-{pattern}`
+
+To skip `backend.tf` generation entirely, set `backend.type: "disabled"` at the desired scope.
+
+#### Common flags
+
+- `use_profile`: when `true`, writes `profile = "..."`
+- `use_assume_role`: when `true`, writes `assume_role = { ... }`
+- `use_lock_table`: when `true`, writes `dynamodb_table = "..."`
+- `key_template`: custom state path in S3
+- `role_template`: custom role name used to build `assume_role.role_arn`
+
+#### Override levels (quick view)
+
+You can override backend keys at these levels:
+
+- Global: `infrastructure.backend`
+- Organization layer: `infrastructure.organization.backend`
+- Security layer: `infrastructure.security.backend`
+- Environment: `infrastructure.environments.<env>.backend`
+- Project: `infrastructure.environments.<env>.projects[].<key>.backend`
+- Workload: `infrastructure.environments.<env>.workloads[].<key>.backend`
+
+Combined example (override levels + `key_template` + `role_template`):
+
+```yaml
+infrastructure:
+  backend:
+    use_assume_role: true
+    use_lock_table: true
+    use_profile: true
+    key_template: "{{.AccountID}}/{{.Layer}}/terraform.tfstate"
+    role_template: "{{.Company}}-{{.BackendAccount}}-{{.AccountID}}"
+
+  organization:
+    aws_account: "123456789012"
+    backend:
+      use_assume_role: false
+      key_template: "{{.Company}}/org/{{.Layer}}/terraform.tfstate"
+
+  security:
+    aws_account: "123456789013"
+    backend:
+      use_lock_table: false
+      role_template: "security-{{.BackendAccount}}-{{.AccountID}}"
+
+  environments:
+    dev:
+      backend:
+        use_assume_role: false
+        key_template: "{{.Company}}/{{.Environment}}/{{.Layer}}/terraform.tfstate"
+      projects:
+        - core:
+            backend:
+              use_profile: false
+              key_template: "{{.Company}}/core/{{.Environment}}/terraform.tfstate"
+              role_template: "project-{{.BackendAccount}}-{{.AccountID}}"
+      workloads:
+        - api:
+            backend:
+              use_lock_table: false
+              role_template: "workload-{{.BackendAccount}}-{{.AccountID}}"
+```
 
 #### Template variables
 
@@ -711,32 +789,6 @@ GoCloud generates `backend.tf` (Terraform state: S3 + DynamoDB). If you omit `ba
 - `{{.Client}}` — Client name (e.g. `"test-client"`)
 
 Default `role_template` if not set: `{{.Company}}-{{.BackendAccount}}-{{.BackendPattern}}-{{.AccountID}}`.
-
-**Example** (global + overrides at env, project, workload):
-
-```yaml
-infrastructure:
-  backend:
-    pattern: "s3-backend"
-    region: "us-east-1"
-    account: "sha"
-    key_template: "{{.AccountID}}/{{.Layer}}/terraform.tfstate"
-    role_template: "{{.Company}}-{{.BackendAccount}}-{{.AccountID}}"
-
-  environments:
-    prd:
-      backend:
-        key_template: "{{.Company}}/{{.Environment}}/{{.Layer}}/terraform.tfstate"
-      projects:
-        - core:
-            backend:
-              key_template: "{{.Company}}/core/{{.Environment}}/terraform.tfstate"
-              role_template: "project-{{.BackendAccount}}-{{.AccountID}}"
-      workloads:
-        - api:
-            backend:
-              role_template: "workload-{{.BackendAccount}}-{{.AccountID}}"
-```
 
 ---
 

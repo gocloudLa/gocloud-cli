@@ -1821,6 +1821,59 @@ func TestGenerateOrganization_BackendUsesOrgAccount(t *testing.T) {
 	}
 }
 
+// TestGenerateBackend_ConditionalBlocksRespected ensures backend conditional blocks are omitted
+// when use_assume_role/use_lock_table are disabled.
+func TestGenerateBackend_ConditionalBlocksRespected(t *testing.T) {
+	useAssumeRole := false
+	useLockTable := false
+	config := &models.InfrastructureConfig{
+		Client:  "test-client",
+		Company: "gcl",
+		Region:  "us-east-1",
+		Backend: &models.BackendInfrastructureConfig{
+			Type:          "s3",
+			Pattern:       "tf-backend",
+			Account:       "dev",
+			Encrypt:       true,
+			UseAssumeRole: &useAssumeRole,
+			UseLockTable:  &useLockTable,
+		},
+		AWSSSO: &models.SSOConfig{
+			StartURL: "https://example.awsapps.com/start",
+			Region:   "us-east-1",
+			RoleName: "Admin",
+		},
+		Environments: map[string]models.Environment{
+			"dev": {
+				Name:       "Development",
+				AWSAccount: "123456789012",
+				Projects:   []interface{}{"core"},
+				Workloads:  []interface{}{"api"},
+			},
+		},
+	}
+
+	tempDir := t.TempDir()
+	pg := NewProjectGenerator(config, tempDir, true)
+	if err := pg.Generate(); err != nil {
+		t.Fatalf("Generate() = %v", err)
+	}
+
+	backendPath := filepath.Join(tempDir, "base", "development", "backend.tf")
+	content, err := os.ReadFile(backendPath)
+	if err != nil {
+		t.Fatalf("read base/dev/backend.tf: %v", err)
+	}
+	body := string(content)
+
+	if strings.Contains(body, "assume_role") {
+		t.Errorf("backend.tf must not include assume_role when use_assume_role=false; got:\n%s", body)
+	}
+	if strings.Contains(body, "dynamodb_table") {
+		t.Errorf("backend.tf must not include dynamodb_table when use_lock_table=false; got:\n%s", body)
+	}
+}
+
 // TestGenerateEnvironmentTable_IncludesOrganization ensures README environment table includes Organization row when layer enabled
 func TestGenerateEnvironmentTable_IncludesOrganization(t *testing.T) {
 	config := &models.InfrastructureConfig{

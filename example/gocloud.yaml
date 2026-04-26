@@ -58,10 +58,12 @@ infrastructure:
         # - name: "gitlab"
   #   secrets:
   #     type: "sops"
-  #   backend:     # Optional: override backend only for organization/backend.tf (pattern, region, encrypt, etc.)
+  #   backend:     # Optional: override backend only for organization/backend.tf (pattern, region, encrypt, profiles/assume_role/lock table, etc.)
   #     pattern: "org-backend"
   #     region: "us-east-1"
   #     encrypt: true
+  #     use_assume_role: false   # Optional: omit assume_role block in backend.tf
+  #     use_lock_table: false    # Optional: omit dynamodb_table in backend.tf
   #   aws_sso:                      # Optional: override SSO for org profile
   #     start_url: "https://..."
   #     role_name: "Admin"
@@ -79,6 +81,8 @@ infrastructure:
   #   encrypt: true
   #   type: "s3"  # Default: "s3"
   #   use_profile: true  # Default: true
+  #   use_assume_role: true  # Default: true
+  #   use_lock_table: true   # Default: true
   #   # bucket_name: "my-custom-terraform-state-bucket"  # Default: {company}-{account}-{pattern}
   #   # dynamodb_table_name: "my-custom-terraform-locks" # Default: {company}-{account}-{pattern}
   
@@ -171,6 +175,8 @@ infrastructure:
         type: "s3"
         key_template: "{{.Company}}/{{.Environment}}/{{.Layer}}/terraform.tfstate"
         use_profile: false  # Disable profiles for this environment
+        use_assume_role: false  # Same-account backend access (no assume_role block)
+        use_lock_table: true    # Keep DynamoDB lock table (set false to omit dynamodb_table)
       providers:
         use_profiles: false  # Disable profiles for this environment
         default_providers:
@@ -184,6 +190,8 @@ infrastructure:
             name: "Deposits"        # metadata.tf: project = "Deposits"
             backend:
               key_template: "{{.Company}}/deposits/{{.Environment}}/terraform.tfstate"
+              role_template: "project-{{.BackendAccount}}-{{.AccountID}}"
+              use_assume_role: true   # Explicit override (inherits from env/global when omitted)
             providers:
               use_profiles: true    # Override environment setting
               default_providers:
@@ -216,6 +224,8 @@ infrastructure:
             name: "Deposits"        # metadata.tf: project = "Deposits"
             backend:
               use_profile: true     # Override environment setting
+              role_template: "workload-{{.BackendAccount}}-{{.AccountID}}"
+              use_lock_table: false # Disable lock table only for this workload backend.tf
             providers:
               use_profiles: true    # Override environment setting
               default_providers:
@@ -230,6 +240,7 @@ infrastructure:
             backend:
               type: "s3"
               key_template: "{{.Company}}/withdrawals/{{.Environment}}/terraform.tfstate"
+              use_assume_role: false # Example: no assume_role on this specific workload
             providers:
               use_profiles: false   # Disable profiles for this workload
               default_providers:
