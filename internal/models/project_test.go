@@ -844,6 +844,8 @@ func TestResolveBackendConfig(t *testing.T) {
 // (as documented in gocloud-example-config.yaml: project "dept" and workload "dept"/"wdwl" with backend overrides).
 func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 	useProfileTrue := true
+	useAssumeRoleFalse := false
+	useLockTableFalse := false
 	config := &InfrastructureConfig{
 		Company: "gcl",
 		Region:  "us-east-1",
@@ -876,7 +878,9 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 						Key:  "dept",
 						Name: "Deposits",
 						Backend: &BackendInfrastructureConfig{
-							UseProfile: &useProfileTrue,
+							UseProfile:    &useProfileTrue,
+							UseAssumeRole: &useAssumeRoleFalse,
+							UseLockTable:  &useLockTableFalse,
 						},
 					},
 					WorkloadItem{
@@ -900,6 +904,8 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 		wantKey    string
 		wantType   string
 		wantUse    *bool
+		wantAssume *bool
+		wantLock   *bool
 	}{
 		{
 			name:       "project with backend override (key_template)",
@@ -909,6 +915,8 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 			wantKey:    "{{.Company}}/deposits/{{.Environment}}/terraform.tfstate",
 			wantType:   "",
 			wantUse:    nil,
+			wantAssume: nil,
+			wantLock:   nil,
 		},
 		{
 			name:       "project without backend override inherits env",
@@ -918,6 +926,8 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 			wantKey:    "{{.Company}}/{{.Environment}}/terraform.tfstate",
 			wantType:   "",
 			wantUse:    nil,
+			wantAssume: nil,
+			wantLock:   nil,
 		},
 		{
 			name:       "workload with backend override (use_profile)",
@@ -927,6 +937,8 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 			wantKey:    "{{.Company}}/{{.Environment}}/terraform.tfstate",
 			wantType:   "",
 			wantUse:    &useProfileTrue,
+			wantAssume: &useAssumeRoleFalse,
+			wantLock:   &useLockTableFalse,
 		},
 		{
 			name:       "workload with backend override (type, key_template)",
@@ -936,6 +948,8 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 			wantKey:    "{{.Company}}/withdrawals/{{.Environment}}/terraform.tfstate",
 			wantType:   "s3",
 			wantUse:    nil,
+			wantAssume: nil,
+			wantLock:   nil,
 		},
 		{
 			name:       "workload without backend override inherits",
@@ -945,6 +959,8 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 			wantKey:    "{{.Company}}/{{.Environment}}/terraform.tfstate",
 			wantType:   "",
 			wantUse:    nil,
+			wantAssume: nil,
+			wantLock:   nil,
 		},
 	}
 
@@ -964,6 +980,16 @@ func TestResolveBackendConfigWithProjectWorkloadOverrides(t *testing.T) {
 				t.Errorf("UseProfile presence = %v, want %v", result.UseProfile != nil, tt.wantUse != nil)
 			} else if tt.wantUse != nil && result.UseProfile != nil && *result.UseProfile != *tt.wantUse {
 				t.Errorf("UseProfile = %v, want %v", *result.UseProfile, *tt.wantUse)
+			}
+			if (tt.wantAssume != nil) != (result.UseAssumeRole != nil) {
+				t.Errorf("UseAssumeRole presence = %v, want %v", result.UseAssumeRole != nil, tt.wantAssume != nil)
+			} else if tt.wantAssume != nil && result.UseAssumeRole != nil && *result.UseAssumeRole != *tt.wantAssume {
+				t.Errorf("UseAssumeRole = %v, want %v", *result.UseAssumeRole, *tt.wantAssume)
+			}
+			if (tt.wantLock != nil) != (result.UseLockTable != nil) {
+				t.Errorf("UseLockTable presence = %v, want %v", result.UseLockTable != nil, tt.wantLock != nil)
+			} else if tt.wantLock != nil && result.UseLockTable != nil && *result.UseLockTable != *tt.wantLock {
+				t.Errorf("UseLockTable = %v, want %v", *result.UseLockTable, *tt.wantLock)
 			}
 		})
 	}

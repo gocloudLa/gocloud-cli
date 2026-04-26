@@ -55,8 +55,6 @@ logs/
 coverage.out
 coverage.html
 
-CONTEXT.md
-
 # Temporary files
 tmp/
 temp/
