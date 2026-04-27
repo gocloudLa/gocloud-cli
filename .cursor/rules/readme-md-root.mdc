@@ -1,0 +1,240 @@
+---
+description: Strict, compact standard for root README.md content and format.
+globs: README.md
+alwaysApply: false
+---
+
+# Root README Rule (Strict + Compact)
+
+## Purpose
+
+Use this rule to keep `README.md` reproducible over time: same hierarchy, same section intent, same content format, no duplicated info.
+
+## Rule priority and enforcement
+
+- This rule is a **contract**, not guidance.
+- If a proposed README change conflicts with this rule, **the rule wins**.
+- Do not introduce free-form structures when a required structure exists here.
+- If a section cannot comply, stop and rewrite it to comply before finishing.
+
+## Mandatory global structure
+
+- One `#` title only.
+- Top-level `##` sections in this order:
+  1. `What it does`
+  2. `Install`
+  3. `Quick start`
+  4. `Commands`
+  5. `Configuration file (gocloud.yaml)`
+  6. `Shell completion`
+  7. `Troubleshooting`
+  8. `Related`
+  9. `Development`
+  10. `License`
+- Heading levels are strict: `##` -> `###` -> `####` (no skips).
+- `####` is reserved for individual commands only.
+- In `## Configuration file (gocloud.yaml)`, do **not** use `####`.
+- Do not use HTML (`<details>`, `<summary>`, raw HTML tables).
+
+## Exact content contract by section
+
+### `## What it does` (general overview)
+
+- 4-7 bullets with core capabilities.
+- 1 explicit non-goal/limitation note.
+- No deep technical details here.
+
+### `## Install`
+
+- `### Option N` subsections with runnable `bash` blocks.
+- Include update/check path if relevant.
+- Keep platform differences explicit.
+
+### `## Quick start`
+
+- One minimal end-to-end flow in a single `bash` block.
+- Inline comments allowed for context.
+- Optional steps must be commented, not mixed into mandatory flow text.
+
+### `## Commands` (commands and subcommands)
+
+- Group by capability with `###`.
+- Each command must follow exactly:
+  1. `#### \`gocloud <group> <cmd> [args]\``
+  2. 1 short behavior paragraph
+  3. 1 `bash` example block (common variants)
+- Avoid repeating configuration semantics already documented in config section; reference that section name.
+
+### `## Configuration file (gocloud.yaml)` (specific config behavior)
+
+Must contain:
+
+1. Intro explaining defaults + override/inheritance model.
+2. `### General structure` with representative `yaml` scaffold.
+3. One `###` subsection per configuration domain.
+4. Override scope tables only for **Controls and behavior** subsections.
+
+Mandatory grouping and order inside `## Configuration file (gocloud.yaml)`:
+
+1. **Base modeling** (must come first)
+2. **Special layers** (must come second)
+3. **Controls and behavior** (must come last)
+
+Deterministic classification rules:
+
+- A subsection is **Base modeling** iff it defines YAML model shape/identity (`General structure`, environment/project/workload structure).
+- A subsection is **Special layers** iff it documents `infrastructure.organization.*` or `infrastructure.security.*`.
+- A subsection is **Controls and behavior** iff it documents toggles, overrides, generation behavior, or feature-specific config.
+
+Within each group:
+
+- Keep stable order by scope: global -> environment -> project -> workload.
+- New subsections must be inserted in the correct group and scope order.
+- Do not interleave sections from different groups.
+
+#### Group format contract (strict)
+
+**Base modeling** (`General structure`, `Environments`, `Projects and workloads`):
+
+- Purpose: explain YAML model shape and identity semantics.
+- Required content:
+  - model explanation (keys, identity, structure)
+  - inheritance/default notes
+  - canonical minimal examples
+- Forbidden content:
+  - operational command guidance
+  - deep runtime behavior duplicated from control sections
+
+**Special layers** (`Organization layer`, `Security layer`):
+
+- Purpose: document layer-specific configuration and generation triggers.
+- Required content:
+  - activation condition (`aws_account`)
+  - supported override families (backend/providers/metadata/secrets/sso)
+  - profile and generation implications
+  - one realistic YAML example per layer
+- Forbidden content:
+  - hiding these details only inside unrelated sections/examples
+  - mixing both layers into a single shared subsection
+
+**Controls and behavior**:
+
+- Purpose: document feature toggles, override scope, and generation behavior.
+- Required content:
+  - one feature/control domain per subsection
+  - explicit defaults
+  - explicit `**Override scope:**` table (required)
+  - focused YAML example
+- Forbidden content:
+  - model-shape explanations that belong to Base modeling
+  - layer-activation explanations that belong to Special layers
+
+For each config subsection (`###`), include this block order:
+
+1. `**What it controls:**` 1 short paragraph
+2. `**Default behavior:**` 1-3 bullets
+3. `**Override scope:**` compact table (required only for **Controls and behavior**; optional for **Base modeling** and **Special layers**)
+4. one `yaml` fenced example (minimal but realistic)
+
+Mandatory labels must be **exactly**:
+
+- `**What it controls:**`
+- `**Default behavior:**`
+- `**Override scope:**`
+
+Forbidden replacements (do not use):
+
+- `What it is`, `What they are`
+- `Behavior`
+- `Common flags`
+- `Override levels`, `Override levels (quick view)`
+- inline scope prose such as `Global Y · Environment N ...`
+
+### `## Shell completion`
+
+- `###` by OS/shell.
+- Runnable commands only.
+
+### `## Troubleshooting`
+
+- One `###` per issue.
+- Format: cause (1-2 lines) + fix (`bash` block).
+
+### `## Related`, `## Development`, `## License`
+
+- `Related`: short curated links.
+- `Development`: prerequisites + canonical build/test/lint/fmt commands.
+- `License`: single concise statement.
+
+## Parameter scope table standard
+
+When documenting variables/parameters in `Configuration file` **Controls and behavior** subsections, use a compact table per topic or family:
+
+| Parameter | Global | Environment | Project | Workload |
+|---|:---:|:---:|:---:|:---:|
+| `enable_secrets` | Y | Y | Y | Y |
+| `region` | Y | Y | N | N |
+
+Rules:
+
+- Use `Y/N` only (no ambiguous wording).
+- Keep tables brief (topic-local; do not dump entire schema each time).
+- Use exactly one parameter/key per row in scope tables.
+- Do not group multiple parameters in one row (no `/`, `,`, `and`, or ranges in parameter cells).
+- If scope changes in code, update table and examples in same edit.
+- When present, the `**Override scope:**` block must use this exact table schema:
+
+```md
+**Override scope:**
+
+| Parameter | Global | Environment | Project | Workload |
+|---|:---:|:---:|:---:|:---:|
+| `<key-or-family>` | Y/N | Y/N | Y/N | Y/N |
+```
+
+## Anti-duplication rules
+
+- Define behavior once in its canonical section; elsewhere, reference section name.
+- Do not duplicate long explanations between `Commands` and `Configuration file`.
+- Keep examples complementary, not repetitive.
+- Prefer short text + one good example over multiple near-identical examples.
+
+## Change protocol (strict)
+
+For any new flag, parameter, default, or behavior change:
+
+1. Update canonical section first (`Commands` or `Configuration file`).
+2. Update related examples.
+3. Update scope table if applicable.
+4. Verify no contradiction with `Quick start` and `Troubleshooting`.
+5. Remove/replace stale docs immediately (never leave old behavior documented).
+
+## Writing and format style
+
+- Language: English, concise, instructional.
+- Use backticks for commands, keys, file names.
+- Use fenced `bash`/`yaml` blocks only.
+- Keep markdown lightweight; no deep nesting.
+- Prioritize precision over verbosity.
+
+## Validation checklist (must pass before finishing)
+
+1. Top-level `##` sections are present and in mandatory order.
+2. `####` headings appear only under `## Commands`.
+3. Every `###` subsection under `## Configuration file (gocloud.yaml)` contains:
+   - `**What it controls:**`
+   - `**Default behavior:**`
+   - `**Override scope:**` + required scope table schema **only for Controls and behavior**
+   - one `yaml` example
+4. `## Configuration file (gocloud.yaml)` subsections follow the mandatory order and group boundaries.
+5. `Organization layer` and `Security layer` exist as dedicated `###` subsections.
+6. No section mixes concerns across groups (modeling vs special layers vs controls).
+7. No forbidden labels (`What it is`, `What they are`, `Common flags`, `Override levels`).
+8. No HTML blocks (`<details>`, `<summary>`).
+9. Scope values use only `Y` / `N`.
+10. No duplicated explanation blocks across sections.
+
+## Refusal policy for README edits
+
+- If an edit request would introduce format outside this rule, do not apply it as-is.
+- Rewrite the requested content into this rule's structure and keep all functional information.
