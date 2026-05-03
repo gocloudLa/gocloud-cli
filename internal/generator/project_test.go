@@ -1389,6 +1389,57 @@ func TestGenerate_SkipsGitignoreWhenEnableGitignoreFalse(t *testing.T) {
 	}
 }
 
+func TestGenerate_WritesAirulesBundles(t *testing.T) {
+	config := &models.InfrastructureConfig{
+		Client:  "test-client",
+		Company: "gcl",
+		Region:  "us-east-1",
+		Layers: &models.LayerConfig{
+			Base:       ptrBool(false),
+			Foundation: ptrBool(false),
+		},
+		Environments: map[string]models.Environment{},
+	}
+	tempDir := t.TempDir()
+	pg := NewProjectGenerator(config, tempDir, true)
+	if err := pg.Generate(); err != nil {
+		t.Fatalf("Generate() = %v", err)
+	}
+	for _, p := range []string{
+		filepath.Join(tempDir, ".cursor", "mcp.json"),
+		filepath.Join(tempDir, ".kiro", "settings", "mcp.json"),
+	} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("expected airules bundle file %s: %v", p, err)
+		}
+	}
+}
+
+func TestGenerate_SkipsAirulesWhenEnableAirulesFalse(t *testing.T) {
+	config := &models.InfrastructureConfig{
+		Client:        "test-client",
+		Company:       "gcl",
+		Region:        "us-east-1",
+		EnableAirules: ptrBool(false),
+		Layers: &models.LayerConfig{
+			Base:       ptrBool(false),
+			Foundation: ptrBool(false),
+		},
+		Environments: map[string]models.Environment{},
+	}
+	tempDir := t.TempDir()
+	pg := NewProjectGenerator(config, tempDir, true)
+	if err := pg.Generate(); err != nil {
+		t.Fatalf("Generate() = %v", err)
+	}
+	cursorDir := filepath.Join(tempDir, ".cursor")
+	if _, err := os.Stat(cursorDir); err == nil {
+		t.Errorf(".cursor must not be created when infrastructure.enable_airules is false")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat .cursor: %v", err)
+	}
+}
+
 func TestGenerateOrganizationSecrets_GeneratesFileWhenEnabled(t *testing.T) {
 	// When organization layer is enabled (layers.organization + infrastructure.organization.aws_account) and enable_secrets is true,
 	// Generate() must create organization/_secrets.tf.

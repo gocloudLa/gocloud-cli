@@ -724,18 +724,7 @@ func (pg *ProjectGenerator) generateRootConfigs() error {
 		}
 	}
 
-	if IsGitignoreGenerationEnabledForConfig(pg.config) {
-		gitignorePath := filepath.Join(pg.workingDir, ".gitignore")
-		if err := pg.writeFileWithConfirmation(gitignorePath, infrastructureGitignoreContent); err != nil {
-			if errors.Is(err, ErrFileSkipped) {
-				logger.Info(".gitignore skipped by user")
-			} else {
-				return err
-			}
-		}
-	} else {
-		logger.Info(".gitignore skipped - infrastructure.enable_gitignore is false")
-	}
+	// Root .gitignore and airules bundles are generated in separate cmd steps (see GenerateGitignore / GenerateAirules).
 
 	// Note: terragrunt.hcl in root is no longer needed with the new structure
 
@@ -2087,25 +2076,13 @@ func (pg *ProjectGenerator) Generate() error {
 	if err := pg.GenerateConfigFiles(); err != nil {
 		return err
 	}
-	if err := pg.GenerateRootConfigs(); err != nil {
+	if _, err := pg.GenerateGitignore(); err != nil {
 		return err
 	}
-	if err := pg.GenerateLayerConfigs(); err != nil {
+	if _, err := pg.GenerateAirules(); err != nil {
 		return err
 	}
-	if err := pg.GenerateProjectFiles(); err != nil {
-		return err
-	}
-	if err := pg.GenerateWorkloadFiles(); err != nil {
-		return err
-	}
-	if err := pg.GenerateOrganizationFiles(); err != nil {
-		return err
-	}
-	if err := pg.GenerateSecurityFiles(); err != nil {
-		return err
-	}
-	if err := pg.GenerateREADME(); err != nil {
+	if err := pg.GenerateDocumentation(); err != nil {
 		return err
 	}
 	return nil
@@ -2519,6 +2496,18 @@ func IsGitignoreGenerationEnabledForConfig(config *models.InfrastructureConfig) 
 	}
 	if config.EnableGitignore != nil {
 		return *config.EnableGitignore
+	}
+	return true
+}
+
+// IsAirulesGenerationEnabledForConfig reports whether gocloud generate should write `.cursor` and `.kiro`.
+// Default is true when omitted; set infrastructure.enable_airules: false to skip.
+func IsAirulesGenerationEnabledForConfig(config *models.InfrastructureConfig) bool {
+	if config == nil {
+		return true
+	}
+	if config.EnableAirules != nil {
+		return *config.EnableAirules
 	}
 	return true
 }

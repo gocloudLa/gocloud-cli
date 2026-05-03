@@ -16,6 +16,7 @@ infrastructure:
   enable_secrets: true  # Global secrets setting (default: true)
   enable_terragrunt: true  # Global terragrunt setting (default: true)
   # enable_gitignore: true  # (default: true) generate root .gitignore; false = CLI does not write .gitignore
+  # enable_airules: true     # (default: true) generate .cursor and .kiro AI bundles; false = CLI does not write them
   # Secrets backend configuration (optional, default backend: "ssm")
   # secrets:
   #   type: "ssm"  # or "sops"

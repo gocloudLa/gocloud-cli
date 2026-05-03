@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "aws-documentation": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "awslabs.aws-documentation-mcp-server@latest"
+      ],
+      "env": {
+        "AWS_DOCUMENTATION_PARTITION": "aws",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      },
+      "disabled": false,
+      "autoApprove": ["*"]
+    },
+    "terraform-mcp": {
+      "type": "stdio",
+      "command": "/bin/sh",
+      "args": [
+        "-c",
+        "exec \"$(go env GOPATH)/bin/terraform-mcp-server\" stdio"
+      ],
+      "env": {},
+      "disabled": false,
+      "autoApprove": ["*"]
+    }
+  }
+}
