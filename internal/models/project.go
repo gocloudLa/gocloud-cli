@@ -47,6 +47,7 @@ type InfrastructureConfig struct {
 	EnableSecrets    *bool                        `json:"enable_secrets" yaml:"enable_secrets,omitempty"`
 	EnableTerragrunt *bool                        `json:"enable_terragrunt" yaml:"enable_terragrunt,omitempty"`
 	EnableGitignore  *bool                        `json:"enable_gitignore" yaml:"enable_gitignore,omitempty"`
+	EnableAirules    *bool                        `json:"enable_airules" yaml:"enable_airules,omitempty"`
 	Layers           *LayerConfig                 `json:"layers" yaml:"layers,omitempty"`
 	Backend          *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`
 	AWSSSO           *SSOConfig                   `json:"aws_sso" yaml:"aws_sso,omitempty"`
@@ -846,12 +847,12 @@ type BackendInfrastructureConfig struct {
 	BucketName        string `json:"bucket_name" yaml:"bucket_name,omitempty"`
 	DynamoDBTableName string `json:"dynamodb_table_name" yaml:"dynamodb_table_name,omitempty"`
 	// New features
-	Type          string `json:"type" yaml:"type,omitempty"`                               // "s3" (default)
-	KeyTemplate   string `json:"key_template" yaml:"key_template,omitempty"`               // Template for S3 key
-	RoleTemplate  string `json:"role_template" yaml:"role_template,omitempty"`             // Template for role name
-	UseProfile    *bool  `json:"use_profile" yaml:"use_profile,omitempty"`                 // Control profiles
-	UseAssumeRole *bool  `json:"use_assume_role" yaml:"use_assume_role,omitempty"`         // Control backend assume_role block generation
-	UseLockTable  *bool  `json:"use_lock_table" yaml:"use_lock_table,omitempty"`           // Control backend dynamodb_table generation
+	Type          string `json:"type" yaml:"type,omitempty"`                       // "s3" (default)
+	KeyTemplate   string `json:"key_template" yaml:"key_template,omitempty"`       // Template for S3 key
+	RoleTemplate  string `json:"role_template" yaml:"role_template,omitempty"`     // Template for role name
+	UseProfile    *bool  `json:"use_profile" yaml:"use_profile,omitempty"`         // Control profiles
+	UseAssumeRole *bool  `json:"use_assume_role" yaml:"use_assume_role,omitempty"` // Control backend assume_role block generation
+	UseLockTable  *bool  `json:"use_lock_table" yaml:"use_lock_table,omitempty"`   // Control backend dynamodb_table generation
 }
 
 // ProviderAssumeRole represents assume_role block for a provider (e.g. AWS cross-account)

@@ -105,10 +105,20 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create project structure: %w", err)
 	}
 
-	// Generate configuration files
+	// Generate configuration files (layers, org, security, root.hcl)
 	utils.PrintWarning("📝 Generating configuration files...")
 	if err := gen.GenerateConfigFiles(); err != nil {
 		return fmt.Errorf("failed to generate config files: %w", err)
+	}
+
+	utils.PrintWarning("📄 Generating root .gitignore...")
+	if _, err := gen.GenerateGitignore(); err != nil {
+		return fmt.Errorf("failed to write root .gitignore: %w", err)
+	}
+
+	utils.PrintWarning("🧩 Generating airules bundle (.cursor / .kiro)...")
+	if _, err := gen.GenerateAirules(); err != nil {
+		return fmt.Errorf("failed to write airules bundle: %w", err)
 	}
 
 	// Setup AWS SSO
@@ -377,6 +387,10 @@ func showFilesToGenerate(config *models.InfrastructureConfig) {
 	// Root level files
 	if generator.IsGitignoreGenerationEnabledForConfig(config) {
 		utils.PrintText("   %s/.gitignore\n", baseDir)
+	}
+	if generator.IsAirulesGenerationEnabledForConfig(config) {
+		utils.PrintText("   %s/.cursor/**  (airules bundle maintained by GoCloud CLI)\n", baseDir)
+		utils.PrintText("   %s/.kiro/**   (airules bundle maintained by GoCloud CLI)\n", baseDir)
 	}
 	utils.PrintText("   %s/root.hcl\n", baseDir)
 	utils.PrintText("   %s/README.md\n", baseDir)

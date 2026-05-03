@@ -218,6 +218,8 @@ func ValidateConfigWithUnknownFields(yamlData []byte) (*ValidationResult, error)
 				"source_ref":        true,
 				"enable_secrets":    true,
 				"enable_terragrunt": true,
+				"enable_gitignore":  true,
+				"enable_airules":    true,
 				"layers":            true,
 				"backend":           true,
 				"providers":         true,
@@ -227,6 +229,7 @@ func ValidateConfigWithUnknownFields(yamlData []byte) (*ValidationResult, error)
 				"environment_order": true,
 				"secrets":           true,
 				"organization":      true,
+				"security":          true,
 			}
 
 			for field := range infraMap {
