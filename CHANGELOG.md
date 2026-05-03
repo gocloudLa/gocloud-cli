@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.8.0...v1.9.0) (2026-05-03)
+
+
+### Features
+
+* **generate:** add enable_airules and root .gitignore with embedded … ([#33](https://github.com/gocloudLa/gocloud-cli/issues/33)) ([a78316e](https://github.com/gocloudLa/gocloud-cli/commit/a78316ed3e7a0d42060ea69f030adf9582d415e9))
+
 ## [1.8.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.7.0...v1.8.0) (2026-04-26)
 
 
