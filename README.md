@@ -285,7 +285,7 @@ Inspects Terraform dependency pins under a directory tree (default: current work
 ```bash
 gocloud module deps check                           # Plain text + colored status; exit 1 if any registry module is outdated
 gocloud module deps check --json                    # Same module rows as plain output (JSON); no providers section
-gocloud module deps check --bump-plan               # Bump plan JSON (branch, pr_title, pr_body, marker, …) — legacy --bump-plan-json shape
+gocloud module deps check --bump-plan               # Bump plan JSON: one item per outdated pin per file (`path`, branch, pr_title, pr_body, …)
 gocloud module deps update SRC CUR NEW path/to/file.tf   # Rewrite one double-quoted pin (source then version on next lines)
 ```
 

@@ -55,7 +55,7 @@ func init() {
 	depsCmd.PersistentFlags().StringVar(&depsRoot, "dir", "", `Root directory for *.tf scan (default: current working directory)`)
 
 	moduleDepsCheckCmd.Flags().BoolVar(&depsJSON, "json", false, "Print JSON for the same module lines as plain output (no providers)")
-	moduleDepsCheckCmd.Flags().BoolVar(&depsBumpPlan, "bump-plan", false, "Print bump plan JSON (legacy --bump-plan-json)")
+	moduleDepsCheckCmd.Flags().BoolVar(&depsBumpPlan, "bump-plan", false, "Print bump plan JSON (one item per file path)")
 }
 
 func runModuleDepsCheck(_ *cobra.Command, _ []string) error {

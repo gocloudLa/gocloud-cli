@@ -2,6 +2,8 @@ package moddeps
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,8 +33,8 @@ type ModuleLineStatus struct {
 
 // ModulesCheckJSON is `gocloud module deps check --json`: same module rows as plain output (no providers).
 type ModulesCheckJSON struct {
-	Root    string             `json:"root"`
-	Modules []ModuleLineStatus `json:"modules"`
+	Root    string              `json:"root"`
+	Modules []ModuleLineStatus  `json:"modules"`
 	Summary ModulesCheckSummary `json:"summary"`
 }
 
@@ -41,12 +43,12 @@ type ModulesCheckSummary struct {
 	OutdatedCount int `json:"outdated_count"`
 }
 
-// BumpPlanItem matches Python build_bump_plan items.
+// BumpPlanItem is one outdated pin at one file location (--bump-plan emits one item per .tf path).
 type BumpPlanItem struct {
 	Source               string   `json:"source"`
 	Current              string   `json:"current"`
 	Latest               string   `json:"latest"`
-	Paths                []string `json:"paths"`
+	Path                 string   `json:"path"`
 	Branch               string   `json:"branch"`
 	PRTitle              string   `json:"pr_title"`
 	PRBody               string   `json:"pr_body"`
@@ -54,7 +56,7 @@ type BumpPlanItem struct {
 	UpstreamCommitTitles []string `json:"upstream_commit_titles"`
 }
 
-// BumpPlan wraps items for CI (same shape as --bump-plan-json).
+// BumpPlan is the JSON envelope for `check --bump-plan`.
 type BumpPlan struct {
 	Items []BumpPlanItem `json:"items"`
 }
@@ -119,28 +121,37 @@ func (c *Client) ListOutdatedModules(ctx context.Context, root string) ([]Outdat
 	return out, nil
 }
 
-// BuildBumpPlan produces the same structure as Python --bump-plan-json.
+// bumpBranch returns a unique branch name per (source, latest, path) so parallel jobs do not collide.
+func bumpBranch(source, latest, path string) string {
+	slug := strings.ReplaceAll(source, "/", "-")
+	sum := sha256.Sum256([]byte(source + "\n" + latest + "\n" + path))
+	suf := hex.EncodeToString(sum[:4])
+	return fmt.Sprintf("deps/terraform-%s-%s-%s", slug, latest, suf)
+}
+
+// BuildBumpPlan emits one item per outdated pin per file (same shape as check --json for `path`).
 func (c *Client) BuildBumpPlan(ctx context.Context, root string) (*BumpPlan, error) {
 	rows, err := c.ListOutdatedModules(ctx, root)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]BumpPlanItem, 0, len(rows))
+	items := make([]BumpPlanItem, 0)
 	for _, row := range rows {
-		meta := c.BuildPRMeta(ctx, row.Source, row.Current, row.Latest, row.Paths, row.UpstreamCommitTitles)
-		slug := strings.ReplaceAll(row.Source, "/", "-")
-		branch := fmt.Sprintf("deps/terraform-%s-%s", slug, row.Latest)
-		items = append(items, BumpPlanItem{
-			Source:               row.Source,
-			Current:              row.Current,
-			Latest:               row.Latest,
-			Paths:                row.Paths,
-			Branch:               branch,
-			PRTitle:              meta.Title,
-			PRBody:               meta.Body,
-			Marker:               meta.Marker,
-			UpstreamCommitTitles: append([]string(nil), row.UpstreamCommitTitles...),
-		})
+		titles := append([]string(nil), row.UpstreamCommitTitles...)
+		for _, p := range row.Paths {
+			meta := c.BuildPRMeta(ctx, row.Source, row.Current, row.Latest, []string{p}, titles)
+			items = append(items, BumpPlanItem{
+				Source:               row.Source,
+				Current:              row.Current,
+				Latest:               row.Latest,
+				Path:                 p,
+				Branch:               bumpBranch(row.Source, row.Latest, p),
+				PRTitle:              meta.Title,
+				PRBody:               meta.Body,
+				Marker:               meta.Marker,
+				UpstreamCommitTitles: titles,
+			})
+		}
 	}
 	return &BumpPlan{Items: items}, nil
 }
