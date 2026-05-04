@@ -13,7 +13,8 @@ and current product contract, use `README.md` as source of truth.
 - Go CLI (`gocloud`) for scaffolding/maintaining Terraform/Terragrunt project
   structure (organization/security/base/foundation/project/workload).
 - Generates files/dirs, validates YAML, manages secrets (SSM or SOPS+KMS),
-  and configures AWS SSO profiles.
+  configures AWS SSO profiles, and can **inspect** Terraform registry module pins
+  (`gocloud module deps`; reads `*.tf`, calls registry.terraform.io; does not run Terraform).
 - Must **not** execute Terraform/Terragrunt operations.
 - Main stack: Go, Cobra, Viper, promptui, yaml.v3, AWS SDK v2.
 
@@ -30,7 +31,8 @@ and current product contract, use `README.md` as source of truth.
 
 - `cmd/`: Cobra wiring only; no business logic.
 - `internal/`: business logic (`models`, `config`, `generator`, `secrets`,
-  `validation`, `utils`, `templates`, `logger`, `testutils`).
+  `validation`, `utils`, `templates`, `logger`, `notifications`, `version`,
+  `moddeps`, `testutils`).
 - `main.go`: thin entry point calling `cmd.Execute()`.
 - `example/gocloud.yaml`: canonical valid sample.
 
