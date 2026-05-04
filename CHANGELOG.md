@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.9.0...v1.10.0) (2026-05-04)
+
+
+### Features
+
+* **cli:** add gocloud module deps ([#35](https://github.com/gocloudLa/gocloud-cli/issues/35)) ([ee65b35](https://github.com/gocloudLa/gocloud-cli/commit/ee65b357abc22b29c3dba3f00caf52d2acd25c8c))
+
 ## [1.9.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.8.0...v1.9.0) (2026-05-03)
 
 
