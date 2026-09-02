@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.10.0...v1.11.0) (2026-09-02)
+
+
+### Features
+
+* **sso:** add github support ([#37](https://github.com/gocloudLa/gocloud-cli/issues/37)) ([c7ff4e7](https://github.com/gocloudLa/gocloud-cli/commit/c7ff4e7fc67a3d63a4f6e4a37b96a8ed7d4a02df))
+
 ## [1.10.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.9.0...v1.10.0) (2026-05-04)
 
 
