@@ -17,12 +17,23 @@ import (
 	"gocloud-cli/internal/utils"
 )
 
+// ssmAPI is the minimal subset of the SSM client used by Manager. Defining it here allows
+// injecting a mock (see internal/testutils.MockSSMClient) instead of a real *ssm.Client in tests.
+type ssmAPI interface {
+	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+	PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+}
+
 // Manager handles AWS SSM secrets operations
 type Manager struct {
 	config      *models.Config
-	ssm         *ssm.Client
-	clientCache map[string]*ssm.Client
+	ssm         ssmAPI
+	clientCache map[string]ssmAPI
 	cacheMutex  sync.RWMutex
+
+	// testSSMClient, when set (tests only), is returned by getSSMClientForLayer for every layer,
+	// bypassing per-profile AWS config loading. Set it via NewManagerWithClient.
+	testSSMClient ssmAPI
 }
 
 // Layer represents a layer path with parsed components
@@ -86,12 +97,28 @@ func NewManager(config *models.Config) (*Manager, error) {
 	return &Manager{
 		config:      config,
 		ssm:         ssmClient,
-		clientCache: make(map[string]*ssm.Client),
+		clientCache: make(map[string]ssmAPI),
 	}, nil
 }
 
+// NewManagerWithClient creates a secrets Manager backed by a pre-built SSM client (typically a
+// mock such as internal/testutils.MockSSMClient). The injected client is used for every layer,
+// bypassing AWS config/profile loading. Intended for tests.
+func NewManagerWithClient(config *models.Config, client ssmAPI) *Manager {
+	return &Manager{
+		config:        config,
+		clientCache:   make(map[string]ssmAPI),
+		testSSMClient: client,
+	}
+}
+
 // getSSMClientForLayer creates an SSM client for a specific layer/environment with caching
-func (m *Manager) getSSMClientForLayer(layer *Layer) (*ssm.Client, error) {
+func (m *Manager) getSSMClientForLayer(layer *Layer) (ssmAPI, error) {
+	// Tests can inject a client that is used for every layer/profile.
+	if m.testSSMClient != nil {
+		return m.testSSMClient, nil
+	}
+
 	// Determine the profile name based on the environment
 	profileName := fmt.Sprintf("%s-%s", m.config.Infrastructure.Client, layer.Environment)
 

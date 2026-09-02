@@ -36,6 +36,13 @@ type SecretsConfig struct {
 	Type string `json:"type" yaml:"type"` // "ssm" or "sops" (default: "ssm")
 }
 
+// GitHubSSOConfig holds the optional GitHub provider settings for `gocloud sso`.
+// It only declares the organization gocloud verifies membership against; it does not persist
+// or manage GitHub credentials itself (those live in the `gh` CLI's own config).
+type GitHubSSOConfig struct {
+	Organization string `json:"organization" yaml:"organization,omitempty"`
+}
+
 // InfrastructureConfig represents the configuration for a new infrastructure project
 type InfrastructureConfig struct {
 	Client           string                       `json:"client" yaml:"client"`
@@ -51,6 +58,7 @@ type InfrastructureConfig struct {
 	Layers           *LayerConfig                 `json:"layers" yaml:"layers,omitempty"`
 	Backend          *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`
 	AWSSSO           *SSOConfig                   `json:"aws_sso" yaml:"aws_sso,omitempty"`
+	GitHubSSO        *GitHubSSOConfig             `json:"github_sso" yaml:"github_sso,omitempty"`
 	Metadata         map[string]interface{}       `json:"metadata" yaml:"metadata,omitempty"`
 	Environments     map[string]Environment       `json:"environments" yaml:"environments"`
 	EnvironmentOrder []string                     `json:"environment_order" yaml:"environment_order,omitempty"`

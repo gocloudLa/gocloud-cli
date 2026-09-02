@@ -114,6 +114,12 @@ func ValidateConfig(config *Config) error {
 			}
 		}
 
+		// Validate github_sso: the block itself is optional, but when present its organization
+		// is required (there is nothing else to configure and nothing useful to check without it).
+		if config.Infrastructure.GitHubSSO != nil && config.Infrastructure.GitHubSSO.Organization == "" {
+			validationErrors = append(validationErrors, "infrastructure.github_sso.organization is required")
+		}
+
 		// Validate environments (optional - can be empty for CLI-only configs)
 		for envKey, env := range config.Infrastructure.Environments {
 			if err := validation.ValidateEnvironmentKey(envKey); err != nil {
@@ -224,6 +230,7 @@ func ValidateConfigWithUnknownFields(yamlData []byte) (*ValidationResult, error)
 				"backend":           true,
 				"providers":         true,
 				"aws_sso":           true,
+				"github_sso":        true,
 				"metadata":          true,
 				"environments":      true,
 				"environment_order": true,

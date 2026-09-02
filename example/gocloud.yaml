@@ -109,7 +109,13 @@ infrastructure:
     region: "us-east-1"
     start_url: "https://gocloud-la.awsapps.com/start#/"
     role_name: "Admin"
-  
+
+  # Optional: enable the GitHub provider for `gocloud sso` (uses the `gh` CLI directly; gocloud
+  # never stores GitHub credentials). When set, `gocloud sso verify` checks that the currently
+  # logged-in `gh` account belongs to this organization.
+  # github_sso:
+  #   organization: "gocloud-la"
+
   environments:
     sha:
       name: "Shared"
