@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	cfg "gocloud-cli/internal/config"
+	"gocloud-cli/internal/githubauth"
 	"gocloud-cli/internal/models"
 	"gocloud-cli/internal/utils"
 )
@@ -20,46 +22,71 @@ import (
 var (
 	ssoAllProfiles      bool
 	ssoSpecificProfiles string
+	ssoProviderFlag     string
 )
+
+// githubConfigDir is the project-local directory `gh` state lives in, the GitHub-side analog of
+// AWS_CONFIG_FILE=./.aws/config: it keeps a `gocloud sso login --provider github` session scoped
+// to the project directory instead of leaking into every other terminal via ~/.config/gh.
+var githubConfigDir = filepath.Join(".", ".gh")
+
+// newGitHubRunner constructs the githubauth.Runner used by the GitHub-inclusive sso code paths.
+// It is a package-level var (not a plain function) so tests can inject a githubauth.FakeRunner.
+var newGitHubRunner = func() githubauth.Runner { return &githubauth.ExecRunner{ConfigDir: githubConfigDir} }
 
 var ssoCmd = &cobra.Command{
 	Use:   "sso",
-	Short: "Manage AWS SSO configuration and authentication",
-	Long:  `Manage AWS SSO configuration and authentication.`,
+	Short: "Manage AWS and (optionally) GitHub SSO configuration and authentication",
+	Long: `Manage AWS SSO configuration and authentication, and optionally GitHub authentication
+via the gh CLI when infrastructure.github_sso is configured.
+
+Use --provider to restrict which provider(s) a command acts on (aws, github, "aws,github", or
+all). By default (no --provider), a command acts on every provider declared in config.`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if _, err := parseProviderFlag(ssoProviderFlag); err != nil {
+			return err
+		}
+		return nil
+	},
 }
 
 var ssoSetupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "Setup AWS SSO configuration",
+	Short: "Setup AWS (and optionally GitHub) SSO configuration",
 	Long:  `Setup AWS SSO configuration by generating .aws/config file from project configuration.`,
 	RunE:  runSSOSetup,
 }
 
 var ssoListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List available AWS profiles",
+	Short: "List available AWS profiles (and optionally GitHub auth status)",
 	Long:  `List all available AWS profiles from the generated .aws/config file.`,
 	RunE:  runSSOList,
 }
 
 var ssoLoginCmd = &cobra.Command{
-	Use:   "login",
-	Short: "Login to AWS profiles",
-	Long:  `Login to AWS profiles interactively or via parameters.`,
-	RunE:  runSSOLogin,
+	Use:           "login",
+	Short:         "Login to AWS profiles (and optionally GitHub)",
+	Long:          `Login to AWS profiles interactively or via parameters.`,
+	SilenceUsage:  true, // auth failures are not usage mistakes; avoid dumping the help text
+	SilenceErrors: true, // messages are already printed above; return error only for exit status
+	RunE:          runSSOLogin,
 }
 
 var ssoVerifyCmd = &cobra.Command{
-	Use:   "verify",
-	Short: "Verify AWS SSO profile status",
-	Long:  `Verify the status of AWS SSO profiles by checking credentials and account information.`,
-	RunE:  runSSOVerify,
+	Use:           "verify",
+	Short:         "Verify AWS SSO profile status (and optionally GitHub SSO status)",
+	Long:          `Verify the status of AWS SSO profiles by checking credentials and account information.`,
+	SilenceUsage:  true,
+	SilenceErrors: true, // status lines are already printed; soft failures return nil (see runGitHubVerify)
+	RunE:          runSSOVerify,
 }
 
 func init() {
 	// SSO command flags
 	ssoLoginCmd.Flags().BoolVar(&ssoAllProfiles, "all", false, "Login to all available profiles")
 	ssoLoginCmd.Flags().StringVar(&ssoSpecificProfiles, "profiles", "", "Comma-separated list of profile names to login")
+	ssoCmd.PersistentFlags().StringVar(&ssoProviderFlag, "provider", "", `Restrict to provider(s): "aws", "github", "aws,github", or "all" (default: providers declared in config)`)
 
 	// Add subcommands
 	ssoCmd.AddCommand(ssoSetupCmd)
@@ -79,7 +106,7 @@ func checkAWSCLI() error {
 	return nil
 }
 
-func runSSOSetup(cmd *cobra.Command, args []string) error {
+func runSSOSetupAWS(cmd *cobra.Command, args []string) error {
 	utils.PrintInfo("\n🚀 Setting up AWS SSO Configuration")
 	utils.PrintInfo("==================================\n")
 
@@ -149,25 +176,12 @@ func runSSOSetup(cmd *cobra.Command, args []string) error {
 
 	utils.PrintSuccess("✅ AWS SSO configuration setup completed!")
 	utils.PrintText("   AWS_CONFIG_FILE: %s\n", awsConfigFile)
-	// Match generateAWSConfig: only environments with enable_sso (default true) get a profile.
-	profileCount := 0
-	for _, env := range config.Infrastructure.Environments {
-		if models.ShouldEnableSSO(env) {
-			profileCount++
-		}
-	}
-	if organizationSSOEnabled(config.Infrastructure) {
-		profileCount++
-	}
-	if securitySSOEnabled(config.Infrastructure) {
-		profileCount++
-	}
-	utils.PrintText("   Generated profiles: %d\n", profileCount)
+	utils.PrintText("   Generated profiles: %d\n", countSSOProfiles(config))
 
 	return nil
 }
 
-func runSSOList(cmd *cobra.Command, args []string) error {
+func runSSOListAWS(cmd *cobra.Command, args []string) error {
 	utils.PrintInfo("\n📋 AWS Profiles List")
 	utils.PrintInfo("==================\n")
 
@@ -195,7 +209,7 @@ func runSSOList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runSSOLogin(cmd *cobra.Command, args []string) error {
+func runSSOLoginAWS(cmd *cobra.Command, args []string) error {
 	utils.PrintInfo("\n🔐 AWS SSO Login")
 	utils.PrintInfo("===============\n")
 
@@ -373,16 +387,17 @@ func runSSOLogin(cmd *cobra.Command, args []string) error {
 
 	// successCount now reflects the actual validation results
 
-	if successCount == len(profilesToLogin) {
-		utils.PrintSuccess("\n✅ All profiles authenticated successfully!")
-	} else {
+	if successCount != len(profilesToLogin) {
 		failedCount := len(profilesToLogin) - successCount
 		utils.PrintError("\n❌ Authentication failed for %d/%d profiles", failedCount, len(profilesToLogin))
 		utils.PrintWarning("💡 Run 'gocloud sso verify' for detailed status")
-
-		// Exit with error code but don't return error to avoid showing usage
-		os.Exit(1)
+		// Return an error (do not os.Exit) so a combined AWS+GitHub login can still run the
+		// GitHub provider afterward; SilenceUsage/SilenceErrors on ssoLoginCmd keep cobra from
+		// dumping help or double-printing the message.
+		return fmt.Errorf("authentication failed for %d/%d profiles", failedCount, len(profilesToLogin))
 	}
+
+	utils.PrintSuccess("\n✅ All profiles authenticated successfully!")
 
 	utils.PrintText("\n📋 Useful commands:")
 	utils.PrintText("  terragrunt plan -concise --all")
@@ -460,6 +475,36 @@ func securitySSOEnabled(infra *models.InfrastructureConfig) bool {
 	return models.IsSecurityEnabled(infra)
 }
 
+// environmentSSOProfileSkipped reports whether an environment's SSO profile is owned by a
+// global layer profile instead. environments.org and infrastructure.organization both map to
+// {client}-org; environments.sec and infrastructure.security both map to {client}-sec.
+func environmentSSOProfileSkipped(envKey string, infra *models.InfrastructureConfig) bool {
+	if envKey == "org" && organizationSSOEnabled(infra) {
+		return true
+	}
+	if envKey == "sec" && securitySSOEnabled(infra) {
+		return true
+	}
+	return false
+}
+
+// countSSOProfiles returns the number of unique AWS SSO profiles generateAWSConfig writes.
+func countSSOProfiles(config *models.Config) int {
+	count := 0
+	for envKey, env := range config.Infrastructure.Environments {
+		if models.ShouldEnableSSO(env) && !environmentSSOProfileSkipped(envKey, config.Infrastructure) {
+			count++
+		}
+	}
+	if organizationSSOEnabled(config.Infrastructure) {
+		count++
+	}
+	if securitySSOEnabled(config.Infrastructure) {
+		count++
+	}
+	return count
+}
+
 // generateAWSConfig generates AWS config content from project configuration
 func generateAWSConfig(config *models.Config) (string, error) {
 	var content strings.Builder
@@ -470,11 +515,16 @@ func generateAWSConfig(config *models.Config) (string, error) {
 
 	// Map to track which sessions we've already written
 	writtenSessions := make(map[string]bool)
+	writtenProfiles := make(map[string]bool)
 
 	// Generate profiles and their corresponding sessions (only for environments with SSO enabled)
 	for envKey, env := range config.Infrastructure.Environments {
 		// Skip environments that have SSO disabled
 		if !models.ShouldEnableSSO(env) {
+			continue
+		}
+		// Skip when the global organization/security layer already owns this profile name.
+		if environmentSSOProfileSkipped(envKey, config.Infrastructure) {
 			continue
 		}
 
@@ -516,6 +566,7 @@ func generateAWSConfig(config *models.Config) (string, error) {
 		content.WriteString(fmt.Sprintf("region = %s\n", config.Infrastructure.Region))
 		content.WriteString("output = json\n")
 		content.WriteString("\n")
+		writtenProfiles[profileName] = true
 	}
 
 	// Organization layer: add profile {client}-org when organization is enabled and aws_account is set
@@ -541,13 +592,16 @@ func generateAWSConfig(config *models.Config) (string, error) {
 			content.WriteString("\n")
 			writtenSessions[sessionName] = true
 		}
-		content.WriteString(fmt.Sprintf("[profile %s]\n", profileName))
-		content.WriteString(fmt.Sprintf("sso_session = %s\n", sessionName))
-		content.WriteString(fmt.Sprintf("sso_account_id = %s\n", org.AWSAccount))
-		content.WriteString(fmt.Sprintf("sso_role_name = %s\n", ssoRoleName))
-		content.WriteString(fmt.Sprintf("region = %s\n", config.Infrastructure.Region))
-		content.WriteString("output = json\n")
-		content.WriteString("\n")
+		if !writtenProfiles[profileName] {
+			content.WriteString(fmt.Sprintf("[profile %s]\n", profileName))
+			content.WriteString(fmt.Sprintf("sso_session = %s\n", sessionName))
+			content.WriteString(fmt.Sprintf("sso_account_id = %s\n", org.AWSAccount))
+			content.WriteString(fmt.Sprintf("sso_role_name = %s\n", ssoRoleName))
+			content.WriteString(fmt.Sprintf("region = %s\n", config.Infrastructure.Region))
+			content.WriteString("output = json\n")
+			content.WriteString("\n")
+			writtenProfiles[profileName] = true
+		}
 	}
 
 	// Security layer: profile {client}-sec when security.aws_account is set (same rules as organization)
@@ -573,20 +627,23 @@ func generateAWSConfig(config *models.Config) (string, error) {
 			content.WriteString("\n")
 			writtenSessions[sessionName] = true
 		}
-		content.WriteString(fmt.Sprintf("[profile %s]\n", profileName))
-		content.WriteString(fmt.Sprintf("sso_session = %s\n", sessionName))
-		content.WriteString(fmt.Sprintf("sso_account_id = %s\n", sec.AWSAccount))
-		content.WriteString(fmt.Sprintf("sso_role_name = %s\n", ssoRoleName))
-		content.WriteString(fmt.Sprintf("region = %s\n", config.Infrastructure.Region))
-		content.WriteString("output = json\n")
-		content.WriteString("\n")
+		if !writtenProfiles[profileName] {
+			content.WriteString(fmt.Sprintf("[profile %s]\n", profileName))
+			content.WriteString(fmt.Sprintf("sso_session = %s\n", sessionName))
+			content.WriteString(fmt.Sprintf("sso_account_id = %s\n", sec.AWSAccount))
+			content.WriteString(fmt.Sprintf("sso_role_name = %s\n", ssoRoleName))
+			content.WriteString(fmt.Sprintf("region = %s\n", config.Infrastructure.Region))
+			content.WriteString("output = json\n")
+			content.WriteString("\n")
+			writtenProfiles[profileName] = true
+		}
 	}
 
 	return content.String(), nil
 }
 
 // runSSOVerify verifies the status of AWS SSO profiles
-func runSSOVerify(cmd *cobra.Command, args []string) error {
+func runSSOVerifyAWS(cmd *cobra.Command, args []string) error {
 	utils.PrintInfo("🔍 Verifying AWS SSO configuration...")
 
 	// Check if .aws/config exists
@@ -744,4 +801,300 @@ func getExpectedAccountID(profile string) (string, error) {
 	}
 
 	return "", fmt.Errorf("account ID not found for profile %s", profile)
+}
+
+// --- Provider wiring (dispatches to the AWS-only functions above, unchanged, or to the
+// GitHub-inclusive helpers below) ---
+
+// bestEffortInfrastructureConfig tries to load the project config for provider-resolution
+// purposes only. It returns nil (declaring only "aws", see configDeclaredSSOProviders) on ANY
+// error — this preserves the exact pre-existing behavior of `list`, `login`, and `verify`, none
+// of which have ever required a gocloud.yaml to be present.
+func bestEffortInfrastructureConfig(configFile string) *models.InfrastructureConfig {
+	var config *models.Config
+	var err error
+
+	if configFile != "" {
+		cfgManager := cfg.NewManager()
+		config, err = cfgManager.LoadConfig(configFile)
+	} else {
+		config, err = loadConfiguration()
+	}
+
+	if err != nil || config == nil {
+		return nil
+	}
+	return config.Infrastructure
+}
+
+// resolveProvidersForCommand loads config best-effort and resolves the effective provider set
+// for the current invocation (config-declared providers intersected with --provider).
+func resolveProvidersForCommand(cmd *cobra.Command) ([]string, *models.InfrastructureConfig, error) {
+	configFile, _ := cmd.Flags().GetString("config")
+	infra := bestEffortInfrastructureConfig(configFile)
+	resolved, err := resolveSSOProviders(configDeclaredSSOProviders(infra), ssoProviderFlag)
+	return resolved, infra, err
+}
+
+func containsProvider(providers []string, want string) bool {
+	for _, p := range providers {
+		if p == want {
+			return true
+		}
+	}
+	return false
+}
+
+func runSSOSetup(cmd *cobra.Command, args []string) error {
+	resolved, _, err := resolveProvidersForCommand(cmd)
+	if err != nil {
+		return err
+	}
+	if isAWSOnly(resolved) {
+		return runSSOSetupAWS(cmd, args)
+	}
+	if len(resolved) == 0 {
+		return fmt.Errorf("no requested provider is available: check --provider and infrastructure.github_sso")
+	}
+
+	if containsProvider(resolved, "aws") {
+		if err := runSSOSetupAWS(cmd, args); err != nil {
+			return err
+		}
+	}
+	if containsProvider(resolved, "github") {
+		if err := setupGitHubConfigDir(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// setupGitHubConfigDir creates the project-local .gh directory `gocloud sso login --provider
+// github` scopes its `gh` session to (see githubConfigDir), mirroring runSSOSetupAWS's .aws
+// directory (including a nested .gitignore, `*`, so the generated state is never committed) —
+// same terse "done" output as AWS, no extra "run this next" hint AWS's own setup doesn't print
+// either; that guidance already lives in `gocloud sso login --help`/README.
+func setupGitHubConfigDir() error {
+	utils.PrintInfo("\n🚀 Setting up GitHub SSO Configuration")
+	utils.PrintInfo("=======================================\n")
+
+	utils.PrintWarning("📝 Creating .gh directory...")
+	if err := os.MkdirAll(".gh", 0755); err != nil {
+		return fmt.Errorf("failed to create .gh directory: %w", err)
+	}
+
+	if err := os.WriteFile(".gh/.gitignore", []byte("*\n"), 0644); err != nil {
+		return fmt.Errorf("failed to create .gh/.gitignore: %w", err)
+	}
+
+	utils.PrintSuccess("✅ GitHub SSO configuration setup completed!")
+	utils.PrintText("   GH_CONFIG_DIR: %s\n", githubConfigDir)
+	return nil
+}
+
+func runSSOList(cmd *cobra.Command, args []string) error {
+	resolved, _, err := resolveProvidersForCommand(cmd)
+	if err != nil {
+		return err
+	}
+	if isAWSOnly(resolved) {
+		return runSSOListAWS(cmd, args)
+	}
+	if len(resolved) == 0 {
+		return fmt.Errorf("no requested provider is available: check --provider and infrastructure.github_sso")
+	}
+
+	if containsProvider(resolved, "aws") {
+		if err := runSSOListAWS(cmd, args); err != nil {
+			return err
+		}
+	}
+	if containsProvider(resolved, "github") {
+		printGitHubListInfo(cmd.Context())
+	}
+	return nil
+}
+
+func runSSOLogin(cmd *cobra.Command, args []string) error {
+	resolved, _, err := resolveProvidersForCommand(cmd)
+	if err != nil {
+		return err
+	}
+	if isAWSOnly(resolved) {
+		return runSSOLoginAWS(cmd, args)
+	}
+	if len(resolved) == 0 {
+		return fmt.Errorf("no requested provider is available: check --provider and infrastructure.github_sso")
+	}
+
+	var firstErr error
+	if containsProvider(resolved, "aws") {
+		if err := runSSOLoginAWS(cmd, args); err != nil {
+			firstErr = err
+		}
+	}
+	if containsProvider(resolved, "github") {
+		if err := runGitHubLogin(cmd.Context()); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+func runSSOVerify(cmd *cobra.Command, args []string) error {
+	resolved, infra, err := resolveProvidersForCommand(cmd)
+	if err != nil {
+		return err
+	}
+	if isAWSOnly(resolved) {
+		return runSSOVerifyAWS(cmd, args)
+	}
+	if len(resolved) == 0 {
+		return fmt.Errorf("no requested provider is available: check --provider and infrastructure.github_sso")
+	}
+
+	var firstErr error
+	if containsProvider(resolved, "aws") {
+		if containsProvider(resolved, "github") {
+			utils.PrintInfo("ℹ️  GitHub SSO will also be verified after AWS")
+		}
+		if err := runSSOVerifyAWS(cmd, args); err != nil {
+			firstErr = err
+		}
+	}
+	if containsProvider(resolved, "github") {
+		if err := runGitHubVerify(cmd.Context(), infra); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+// --- GitHub-inclusive helpers ---
+
+func hasScope(scopes []string, want string) bool {
+	for _, s := range scopes {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}
+
+// printGitHubListInfo is best-effort and never fails `sso list`: it just reports whether gh is
+// available and, if so, the logged-in account (or a note that it couldn't be determined).
+func printGitHubListInfo(ctx context.Context) {
+	utils.PrintInfo("\n📋 GitHub Auth Status")
+	utils.PrintInfo("====================\n")
+
+	runner := newGitHubRunner()
+	if !runner.Available() {
+		utils.PrintWarning("⚠️  gh CLI not found in PATH")
+		return
+	}
+
+	raw, statusErr := runner.Status(ctx)
+	status := githubauth.ParseStatus(raw)
+	if statusErr != nil || !status.Parsed || !status.LoggedIn {
+		utils.PrintWarning("⚠️  Not logged in to GitHub (run 'gocloud sso login --provider github')")
+		return
+	}
+	utils.PrintText("  *) %s (github.com)\n", status.Account)
+}
+
+// runGitHubLogin runs `gh auth login` via the injected Runner.
+func runGitHubLogin(ctx context.Context) error {
+	utils.PrintInfo("\n🔐 GitHub SSO Login")
+	utils.PrintInfo("==================\n")
+
+	runner := newGitHubRunner()
+	if !runner.Available() {
+		return fmt.Errorf("❌ Error: gh CLI is not installed or not in PATH. Install it first: https://cli.github.com/")
+	}
+
+	// Mirror runSSOLoginAWS's ".aws/config file not found" precondition: without this, a `login`
+	// run before `setup` would write gh state into githubConfigDir with no .gitignore protecting it.
+	if _, err := os.Stat(githubConfigDir); os.IsNotExist(err) {
+		return fmt.Errorf("❌ Error: .gh directory not found. Run 'gocloud sso setup' first")
+	}
+
+	if err := runner.Login(ctx); err != nil {
+		return fmt.Errorf("gh auth login failed: %w", err)
+	}
+
+	utils.PrintSuccess("✅ GitHub authenticated")
+
+	// Show export command for GH_CONFIG_DIR, same wording as the AWS_CONFIG_FILE reminder in
+	// runSSOLoginAWS (line ~415), "profiles" swapped for "session" — GitHub has one session, AWS
+	// has many profiles.
+	utils.PrintInfo("\n🔧 Environment Setup")
+	utils.PrintText("To use the newly authenticated session, export the GH_CONFIG_DIR environment variable:")
+	utils.PrintWarning("  export GH_CONFIG_DIR=$(pwd)/.gh")
+	return nil
+}
+
+// runGitHubVerify checks GitHub auth status, reports token scopes as an advisory, and — when
+// infrastructure.github_sso.organization is set — reports organization membership. Outcome
+// printing matches AWS verifyProfile: not-logged-in, mismatch, and indeterminate are reported
+// with ❌/💡 lines but never fail the command (always return nil). Only precondition/config
+// errors outside this helper (e.g. --provider github with no github_sso declared) fail the
+// command. A status error or unparseable status only warns.
+func runGitHubVerify(ctx context.Context, infra *models.InfrastructureConfig) error {
+	utils.PrintInfo("\n🔍 Verifying GitHub SSO status...")
+
+	runner := newGitHubRunner()
+	if !runner.Available() {
+		utils.PrintWarning("⚠️  gh CLI not found in PATH; skipping GitHub verification")
+		return nil
+	}
+
+	raw, statusErr := runner.Status(ctx)
+	status := githubauth.ParseStatus(raw)
+
+	if statusErr != nil || !status.Parsed {
+		utils.PrintWarning("⚠️  Could not determine GitHub auth status")
+		return nil
+	}
+
+	if !status.LoggedIn {
+		utils.PrintError("❌ GitHub: not logged in")
+		utils.PrintWarning("💡 Run: gocloud sso login --provider github")
+		return nil
+	}
+
+	utils.PrintSuccess("✅ GitHub: logged in as %s", status.Account)
+
+	// Advisory-only scope report: never fails verification, even when read:org is missing.
+	if len(status.Scopes) > 0 {
+		utils.PrintText("   Token scopes: %s\n", strings.Join(status.Scopes, ", "))
+		if !hasScope(status.Scopes, "read:org") {
+			utils.PrintWarning("⚠️  Token is missing the 'read:org' scope; organization membership cannot be verified")
+		}
+	}
+
+	var expectedOrg string
+	if infra != nil && infra.GitHubSSO != nil {
+		expectedOrg = infra.GitHubSSO.Organization
+	}
+	if expectedOrg == "" {
+		// github_sso.organization absent => org check is skipped entirely, no output.
+		return nil
+	}
+
+	switch githubauth.VerifyOrganization(status, statusErr, expectedOrg) {
+	case githubauth.Match:
+		utils.PrintSuccess("✅ GitHub organization: %s (confirmed)", expectedOrg)
+	case githubauth.Mismatch:
+		utils.PrintError("❌ GitHub organization mismatch (expected: %s, got: %s)", expectedOrg, strings.Join(status.Organizations, ", "))
+	case githubauth.Indeterminate:
+		utils.PrintError("❌ Could not confirm GitHub organization membership for %s", expectedOrg)
+		if !hasScope(status.Scopes, "read:org") {
+			utils.PrintWarning("💡 Token is missing the 'read:org' scope; run: gocloud sso login --provider github")
+		} else {
+			utils.PrintWarning("💡 Run: gocloud sso login --provider github")
+		}
+	}
+
+	return nil
 }

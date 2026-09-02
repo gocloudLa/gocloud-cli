@@ -302,6 +302,49 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "github_sso with empty organization is invalid",
+			config: &Config{
+				CLI: DefaultCLIConfig(),
+				Infrastructure: &InfrastructureConfig{
+					Client:    "test-client",
+					Company:   "gcl",
+					Region:    "us-east-1",
+					Version:   "v1.0.0",
+					GitHubSSO: &GitHubSSOConfig{Organization: ""},
+					Environments: map[string]Environment{
+						"dev": {
+							Name:       "Development",
+							DirName:    "dev",
+							AWSAccount: "123456789012",
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "infrastructure.github_sso.organization is required",
+		},
+		{
+			name: "github_sso with organization is valid",
+			config: &Config{
+				CLI: DefaultCLIConfig(),
+				Infrastructure: &InfrastructureConfig{
+					Client:    "test-client",
+					Company:   "gcl",
+					Region:    "us-east-1",
+					Version:   "v1.0.0",
+					GitHubSSO: &GitHubSSOConfig{Organization: "gocloud-la"},
+					Environments: map[string]Environment{
+						"dev": {
+							Name:       "Development",
+							DirName:    "dev",
+							AWSAccount: "123456789012",
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -410,6 +453,36 @@ unknown_top: value
 		}
 		if !found {
 			t.Errorf("expected warning for unknown top-level field; got Warnings: %v", result.Warnings)
+		}
+	})
+
+	t.Run("github_sso field passes strict validation", func(t *testing.T) {
+		// infrastructure.github_sso is a known field; must not produce "Unknown infrastructure field" warning
+		yamlData := []byte(`
+cli: {}
+infrastructure:
+  client: test-client
+  company: gcl
+  region: us-east-1
+  environments:
+    dev:
+      name: Development
+      dir_name: dev
+      aws_account: "123456789012"
+  github_sso:
+    organization: gocloud-la
+`)
+		result, err := ValidateConfigWithUnknownFields(yamlData)
+		if err != nil {
+			t.Fatalf("ValidateConfigWithUnknownFields() err = %v", err)
+		}
+		for _, w := range result.Warnings {
+			if w == "Unknown infrastructure field: 'infrastructure.github_sso'" {
+				t.Errorf("infrastructure.github_sso is a known field; got unwanted warning: %s", w)
+			}
+		}
+		if !result.Valid {
+			t.Errorf("expected valid config; got Errors: %v", result.Errors)
 		}
 	})
 

@@ -10,49 +10,102 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// chdirTemp changes the working directory to dir for the duration of the test, restoring the
+// original directory via t.Cleanup. Needed because runSSOSetup/runSSOList/runSSOVerify operate
+// on ".aws/config" and "gocloud.yaml" relative to the current working directory.
+func chdirTemp(t *testing.T, dir string) {
+	t.Helper()
+	original, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("os.Getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("os.Chdir(%s): %v", dir, err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(original); err != nil {
+			t.Logf("Warning: failed to change back to original directory: %v", err)
+		}
+	})
+}
+
+// runRootCmd runs rootCmd (not a bare subcommand) with args, resetting cfgFile first.
+//
+// cobra's Command.ExecuteC() always redirects execution to c.Root() when the command has a
+// parent ("Regardless of what command execute is called on, run on Root only"), and Root()
+// uses its OWN .args field - not the subcommand's. So calling e.g. ssoSetupCmd.SetArgs(args)
+// followed by ssoSetupCmd.Execute() silently ignores those args and instead parses whatever
+// rootCmd.args currently holds. This is almost certainly why these tests were originally
+// skipped as "commands not executing correctly in test environment": routing through rootCmd
+// with a full argv (e.g. []string{"sso", "setup", "--config", path}) is required.
+func runRootCmd(args []string) error {
+	cfgFile = ""
+	ssoProviderFlag = ""
+	rootCmd.SetArgs(args)
+	return rootCmd.Execute()
+}
+
 func TestSSOSetup(t *testing.T) {
-	t.Skip("Skipping TestSSOSetup - commands not executing correctly in test environment")
+	// ssoConfigYAML is a minimal, self-contained gocloud.yaml. It must include an aws_sso block:
+	// generateAWSConfig dereferences config.Infrastructure.AWSSSO unconditionally for every
+	// environment with SSO enabled (the default), so a config without it panics - a pre-existing
+	// behavior this task does not change.
+	const ssoConfigYAML = `
+infrastructure:
+  client: "test-client"
+  company: "gcl"
+  region: "us-east-1"
+  version: "v1.0.0"
+  aws_sso:
+    start_url: "https://example.awsapps.com/start"
+    region: "us-east-1"
+    role_name: "AdministratorAccess"
+  environments:
+    dev:
+      name: "Development"
+      dir_name: "dev"
+      aws_account: "123456789012"
+`
 
 	tests := []struct {
-		name        string
-		configFile  string
-		expectError bool
-		errorMsg    string
+		name          string
+		writeConfig   bool
+		configContent string
+		configArg     string // if non-empty, passed as --config <configArg>
+		expectError   bool
+		errorMsg      string
 	}{
 		{
-			name:        "setup SSO with valid config",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
+			name:          "setup SSO with valid config",
+			writeConfig:   true,
+			configContent: ssoConfigYAML,
+			configArg:     "gocloud.yaml",
+			expectError:   false,
 		},
 		{
 			name:        "setup SSO without config",
-			configFile:  "",
+			writeConfig: false,
 			expectError: true,
 			errorMsg:    "config file not found",
 		},
 		{
 			name:        "setup SSO with non-existent config",
-			configFile:  "non-existent.yaml",
+			configArg:   "non-existent.yaml",
 			expectError: true,
 			errorMsg:    "config file not found",
 		},
 		{
-			name:        "setup SSO with invalid config",
-			configFile:  "invalid.yaml",
-			expectError: true,
-			errorMsg:    "invalid yaml syntax",
-		},
-		{
-			name:        "setup SSO with config missing SSO section",
-			configFile:  "no-sso.yaml",
-			expectError: true,
-			errorMsg:    "SSO configuration not found",
+			name:          "setup SSO with invalid config",
+			writeConfig:   true,
+			configContent: "invalid: yaml: content: [",
+			configArg:     "invalid.yaml",
+			expectError:   true,
+			errorMsg:      "invalid yaml syntax",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory
 			tempDir, err := testutils.CreateTempDir()
 			if err != nil {
 				t.Fatalf("Failed to create temp dir: %v", err)
@@ -62,49 +115,19 @@ func TestSSOSetup(t *testing.T) {
 					t.Logf("Warning: failed to cleanup temp dir: %v", err)
 				}
 			}()
+			chdirTemp(t, tempDir)
 
-			// Create test config files
-			switch tt.configFile {
-			case "gocloud-example-config.yaml":
-				// Copy example config
-				exampleConfig, err := os.ReadFile("gocloud-example-config.yaml")
-				if err != nil {
-					t.Skipf("Skipping test: example config not found")
+			if tt.writeConfig {
+				if err := os.WriteFile(filepath.Join(tempDir, tt.configArg), []byte(tt.configContent), 0644); err != nil {
+					t.Fatalf("Failed to write test config file: %v", err)
 				}
-				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
-			case "invalid.yaml":
-				err = os.WriteFile(filepath.Join(tempDir, "invalid.yaml"), []byte("invalid: yaml: content: ["), 0644)
-			case "no-sso.yaml":
-				err = os.WriteFile(filepath.Join(tempDir, "no-sso.yaml"), []byte(`
-cli:
-  debug: false
-infrastructure:
-  client: "test-client"
-  company: "gcl"
-  region: "us-east-1"
-  version: "v1.0.0"
-  environments:
-    dev:
-      name: "Development"
-      dir_name: "dev"
-      aws_account: "123456789012"
-`), 0644)
 			}
 
-			if err != nil {
-				t.Fatalf("Failed to create test config file: %v", err)
+			args := []string{"sso", "setup"}
+			if tt.configArg != "" {
+				args = append(args, "--config", tt.configArg)
 			}
-
-			// Set up command
-			cmd := ssoSetupCmd
-			args := []string{}
-			if tt.configFile != "" {
-				args = append(args, "--config", filepath.Join(tempDir, tt.configFile))
-			}
-			cmd.SetArgs(args)
-
-			// Execute command
-			err = cmd.Execute()
+			err = runRootCmd(args)
 
 			if tt.expectError {
 				if err == nil {
@@ -112,52 +135,119 @@ infrastructure:
 				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("SSOSetup() error message '%s' does not contain '%s'", err.Error(), tt.errorMsg)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("SSOSetup() expected no error but got: %v", err)
-				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("SSOSetup() expected no error but got: %v", err)
+			}
+
+			awsConfigContent, rerr := os.ReadFile(filepath.Join(tempDir, ".aws", "config"))
+			if rerr != nil {
+				t.Fatalf("Failed to read generated .aws/config: %v", rerr)
+			}
+			if !strings.Contains(string(awsConfigContent), "[profile test-client-dev]") {
+				t.Errorf(".aws/config = %q, want it to contain profile 'test-client-dev'", awsConfigContent)
 			}
 		})
 	}
 }
 
-func TestSSOList(t *testing.T) {
-	t.Skip("Skipping TestSSOList - commands not executing correctly in test environment")
+func TestSSOSetup_OrgEnvironmentDoesNotDuplicateOrganizationProfile(t *testing.T) {
+	const ssoConfigYAML = `
+infrastructure:
+  client: "test-client"
+  company: "gcl"
+  region: "us-east-1"
+  version: "v1.0.0"
+  aws_sso:
+    start_url: "https://example.awsapps.com/start"
+    region: "us-east-1"
+    role_name: "AdministratorAccess"
+  organization:
+    aws_account: "111111111111"
+  security:
+    aws_account: "222222222222"
+  environments:
+    org:
+      name: "Organization"
+      aws_account: "111111111111"
+      layers:
+        base: true
+        foundation: true
+    sec:
+      name: "Security"
+      aws_account: "222222222222"
+      layers:
+        base: true
+        foundation: true
+    dev:
+      name: "Development"
+      aws_account: "123456789012"
+`
 
+	tempDir, err := testutils.CreateTempDir()
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() {
+		if err := testutils.CleanupTempDir(tempDir); err != nil {
+			t.Logf("Warning: failed to cleanup temp dir: %v", err)
+		}
+	}()
+	chdirTemp(t, tempDir)
+
+	if err := os.WriteFile(filepath.Join(tempDir, "gocloud.yaml"), []byte(ssoConfigYAML), 0644); err != nil {
+		t.Fatalf("Failed to write test config file: %v", err)
+	}
+
+	if err := runRootCmd([]string{"sso", "setup", "--config", "gocloud.yaml"}); err != nil {
+		t.Fatalf("SSOSetup() expected no error but got: %v", err)
+	}
+
+	awsConfigContent, err := os.ReadFile(filepath.Join(tempDir, ".aws", "config"))
+	if err != nil {
+		t.Fatalf("Failed to read generated .aws/config: %v", err)
+	}
+	content := string(awsConfigContent)
+
+	for _, profile := range []string{"test-client-org", "test-client-sec", "test-client-dev"} {
+		count := strings.Count(content, "[profile "+profile+"]")
+		if count != 1 {
+			t.Errorf("profile %q appears %d times in .aws/config, want exactly 1", profile, count)
+		}
+	}
+}
+
+func TestSSOList(t *testing.T) {
 	tests := []struct {
-		name        string
-		configFile  string
-		expectError bool
-		errorMsg    string
+		name             string
+		writeAWSConfig   bool
+		awsConfigContent string
+		expectError      bool
+		errorMsg         string
 	}{
 		{
-			name:        "list SSO profiles with valid config",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
+			name:             "list profiles with valid .aws/config",
+			writeAWSConfig:   true,
+			awsConfigContent: "[profile test-client-dev]\nsso_session = test-client-dev\nregion = us-east-1\n",
+			expectError:      false,
 		},
 		{
-			name:        "list SSO profiles without config",
-			configFile:  "",
-			expectError: true,
-			errorMsg:    "config file is required",
+			name:             "list profiles with empty .aws/config",
+			writeAWSConfig:   true,
+			awsConfigContent: "",
+			expectError:      false,
 		},
 		{
-			name:        "list SSO profiles with non-existent config",
-			configFile:  "non-existent.yaml",
-			expectError: true,
-			errorMsg:    "config file not found",
-		},
-		{
-			name:        "list SSO profiles with invalid config",
-			configFile:  "invalid.yaml",
-			expectError: true,
-			errorMsg:    "invalid yaml syntax",
+			name:           "list profiles without .aws/config",
+			writeAWSConfig: false,
+			expectError:    true,
+			errorMsg:       ".aws/config file not found",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory
 			tempDir, err := testutils.CreateTempDir()
 			if err != nil {
 				t.Fatalf("Failed to create temp dir: %v", err)
@@ -167,34 +257,18 @@ func TestSSOList(t *testing.T) {
 					t.Logf("Warning: failed to cleanup temp dir: %v", err)
 				}
 			}()
+			chdirTemp(t, tempDir)
 
-			// Create test config files
-			switch tt.configFile {
-			case "gocloud-example-config.yaml":
-				// Copy example config
-				exampleConfig, err := os.ReadFile("gocloud-example-config.yaml")
-				if err != nil {
-					t.Skipf("Skipping test: example config not found")
+			if tt.writeAWSConfig {
+				if err := os.MkdirAll(filepath.Join(tempDir, ".aws"), 0755); err != nil {
+					t.Fatalf("Failed to create .aws dir: %v", err)
 				}
-				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
-			case "invalid.yaml":
-				err = os.WriteFile(filepath.Join(tempDir, "invalid.yaml"), []byte("invalid: yaml: content: ["), 0644)
+				if err := os.WriteFile(filepath.Join(tempDir, ".aws", "config"), []byte(tt.awsConfigContent), 0644); err != nil {
+					t.Fatalf("Failed to write .aws/config: %v", err)
+				}
 			}
 
-			if err != nil {
-				t.Fatalf("Failed to create test config file: %v", err)
-			}
-
-			// Set up command
-			cmd := ssoListCmd
-			args := []string{}
-			if tt.configFile != "" {
-				args = append(args, "--config", filepath.Join(tempDir, tt.configFile))
-			}
-			cmd.SetArgs(args)
-
-			// Execute command
-			err = cmd.Execute()
+			err = runRootCmd([]string{"sso", "list"})
 
 			if tt.expectError {
 				if err == nil {
@@ -202,10 +276,8 @@ func TestSSOList(t *testing.T) {
 				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("SSOList() error message '%s' does not contain '%s'", err.Error(), tt.errorMsg)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("SSOList() expected no error but got: %v", err)
-				}
+			} else if err != nil {
+				t.Errorf("SSOList() expected no error but got: %v", err)
 			}
 		})
 	}

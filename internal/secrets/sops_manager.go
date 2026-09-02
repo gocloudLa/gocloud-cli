@@ -21,17 +21,30 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// kmsAPI is the minimal subset of the KMS client used by SOPSManager. Defining it here allows
+// injecting a mock (see internal/testutils.MockKMSClient) instead of a real *kms.Client in tests.
+type kmsAPI interface {
+	DescribeKey(ctx context.Context, params *kms.DescribeKeyInput, optFns ...func(*kms.Options)) (*kms.DescribeKeyOutput, error)
+	CreateKey(ctx context.Context, params *kms.CreateKeyInput, optFns ...func(*kms.Options)) (*kms.CreateKeyOutput, error)
+	CreateAlias(ctx context.Context, params *kms.CreateAliasInput, optFns ...func(*kms.Options)) (*kms.CreateAliasOutput, error)
+	ScheduleKeyDeletion(ctx context.Context, params *kms.ScheduleKeyDeletionInput, optFns ...func(*kms.Options)) (*kms.ScheduleKeyDeletionOutput, error)
+}
+
 // SOPSManager handles SOPS secrets operations
 type SOPSManager struct {
 	config          *models.Config
 	workingDir      string
-	kmsClientCache  map[string]*kms.Client
+	kmsClientCache  map[string]kmsAPI
 	cacheMutex      sync.RWMutex
 	kmsCreatedCache map[string]bool // Track which KMS keys have been created/verified
 	kmsMutex        sync.RWMutex
 
 	// testCheckKMSKeyFunc, when set (tests only), replaces AWS calls in getKMSKeyExists.
 	testCheckKMSKeyFunc func(envKey string) (exists bool, keyId string, err error)
+
+	// testKMSClient, when set (tests only), is returned by getKMSClientForEnvironment for every
+	// environment, bypassing per-profile AWS config loading. Set it via NewSOPSManagerWithClient.
+	testKMSClient kmsAPI
 }
 
 // NewSOPSManager creates a new SOPS secrets manager
@@ -54,13 +67,30 @@ func NewSOPSManager(config *models.Config, workingDir string) (*SOPSManager, err
 	return &SOPSManager{
 		config:          config,
 		workingDir:      workingDir,
-		kmsClientCache:  make(map[string]*kms.Client),
+		kmsClientCache:  make(map[string]kmsAPI),
 		kmsCreatedCache: make(map[string]bool),
 	}, nil
 }
 
+// NewSOPSManagerWithClient creates a SOPSManager backed by a pre-built KMS client (typically a
+// mock such as internal/testutils.MockKMSClient). The injected client is used for every
+// environment, bypassing AWS config/profile loading. Intended for tests.
+func NewSOPSManagerWithClient(config *models.Config, workingDir string, client kmsAPI) (*SOPSManager, error) {
+	m, err := NewSOPSManager(config, workingDir)
+	if err != nil {
+		return nil, err
+	}
+	m.testKMSClient = client
+	return m, nil
+}
+
 // getKMSClientForEnvironment creates a KMS client for a specific environment with caching
-func (m *SOPSManager) getKMSClientForEnvironment(envKey string) (*kms.Client, error) {
+func (m *SOPSManager) getKMSClientForEnvironment(envKey string) (kmsAPI, error) {
+	// Tests can inject a client that is used for every environment.
+	if m.testKMSClient != nil {
+		return m.testKMSClient, nil
+	}
+
 	// Check cache first
 	m.cacheMutex.RLock()
 	if client, exists := m.kmsClientCache[envKey]; exists {

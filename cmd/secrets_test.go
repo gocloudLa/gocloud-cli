@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"gocloud-cli/internal/models"
+	"gocloud-cli/internal/secrets"
 	"gocloud-cli/internal/testutils"
 	"os"
 	"path/filepath"
@@ -10,66 +11,109 @@ import (
 	"testing"
 )
 
-func TestSecretsList(t *testing.T) {
-	t.Skip("Skipping TestSecretsList - commands not executing correctly in test environment")
+// secretsTestConfigYAML is a minimal, self-contained gocloud.yaml (no dependency on any
+// external fixture file) with a "dev" environment and a "core" project/workload, enough to
+// exercise base/foundation/project/workload layer paths against a mocked SSM client.
+const secretsTestConfigYAML = `
+infrastructure:
+  client: "test-client"
+  company: "gcl"
+  region: "us-east-1"
+  version: "v1.0.0"
+  environments:
+    dev:
+      name: "Development"
+      dir_name: "dev"
+      aws_account: "123456789012"
+      projects:
+        - core
+      workloads:
+        - core
+`
 
+// writeSecretsTestConfig writes secretsTestConfigYAML into dir/gocloud.yaml and returns its path.
+func writeSecretsTestConfig(t *testing.T, dir string) string {
+	t.Helper()
+	path := filepath.Join(dir, "gocloud.yaml")
+	if err := os.WriteFile(path, []byte(secretsTestConfigYAML), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	return path
+}
+
+// withMockSecretsManager overrides the newSecretsManagerForLayer seam for the duration of the
+// test so that getSecretsManagerAndLayer returns a *secrets.Manager backed by mockClient instead
+// of hitting real AWS. The original seam is restored via t.Cleanup.
+func withMockSecretsManager(t *testing.T, mockClient *testutils.MockSSMClient) {
+	t.Helper()
+	original := newSecretsManagerForLayer
+	newSecretsManagerForLayer = func(cfg *models.Config, layerPath, workingDir string) (secrets.SecretsManagerInterface, error) {
+		return secrets.NewManagerWithClient(cfg, mockClient), nil
+	}
+	t.Cleanup(func() {
+		newSecretsManagerForLayer = original
+	})
+}
+
+// withSecretsConfigPath sets the package-level secretsConfig var (read by loadSecretsConfig)
+// for the duration of the test and restores it via t.Cleanup.
+func withSecretsConfigPath(t *testing.T, path string) {
+	t.Helper()
+	original := secretsConfig
+	secretsConfig = path
+	t.Cleanup(func() {
+		secretsConfig = original
+	})
+}
+
+// Note on scope: runSecretsList/Get/Set/Delete call handleCredentialError/handleContentError,
+// which call os.Exit(1) directly when the underlying manager error matches a credential or
+// "not found" pattern (see isContentError/utils.IsCredentialError). That means those specific
+// branches cannot be exercised here without killing the test process (a subprocess-reexec test
+// would be needed, which is out of scope). The error *classification* is covered by
+// TestIsContentError below and by internal/secrets tests (credential/ParameterNotFound paths
+// against the mock SSM client). The cases below only cover paths that return normally: success
+// against the mock, and errors that surface before any manager call (invalid layer path,
+// missing config).
+
+func TestSecretsList(t *testing.T) {
 	tests := []struct {
 		name        string
 		layerPath   string
-		configFile  string
+		parameters  map[string]string
 		expectError bool
 		errorMsg    string
 	}{
 		{
-			name:        "list secrets for base layer",
-			layerPath:   "base/dev",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
+			name:       "list secrets for base layer",
+			layerPath:  "base/dev",
+			parameters: map[string]string{"/terraform/gcl-dev-base": `{"api_key":"secret123"}`},
 		},
 		{
-			name:        "list secrets for foundation layer",
-			layerPath:   "foundation/dev",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
+			name:       "list secrets for foundation layer",
+			layerPath:  "foundation/dev",
+			parameters: map[string]string{"/terraform/gcl-dev-foundation": `{"database_url":"postgres://localhost/db"}`},
 		},
 		{
-			name:        "list secrets for project layer",
-			layerPath:   "project/core/dev",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
+			name:       "list secrets for project layer",
+			layerPath:  "project/core/dev",
+			parameters: map[string]string{"/terraform/gcl-dev-core-project": `{"api_key":"secret123"}`},
 		},
 		{
-			name:        "list secrets for workload layer",
-			layerPath:   "workload/core/dev",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
+			name:       "list secrets for workload layer",
+			layerPath:  "workload/core/dev",
+			parameters: map[string]string{"/terraform/gcl-dev-core-workload": `{"api_key":"secret123"}`},
 		},
 		{
 			name:        "list secrets with invalid layer path",
 			layerPath:   "invalid/layer",
-			configFile:  "gocloud-example-config.yaml",
 			expectError: true,
 			errorMsg:    "invalid layer path",
-		},
-		{
-			name:        "list secrets without layer path",
-			layerPath:   "",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: true,
-			errorMsg:    "layer path is required",
-		},
-		{
-			name:        "list secrets with non-existent config",
-			layerPath:   "base/dev",
-			configFile:  "non-existent.yaml",
-			expectError: true,
-			errorMsg:    "config file not found",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory
 			tempDir, err := testutils.CreateTempDir()
 			if err != nil {
 				t.Fatalf("Failed to create temp dir: %v", err)
@@ -80,31 +124,10 @@ func TestSecretsList(t *testing.T) {
 				}
 			}()
 
-			// Copy example config if needed
-			if tt.configFile == "gocloud-example-config.yaml" {
-				exampleConfig, err := os.ReadFile("gocloud-example-config.yaml")
-				if err != nil {
-					t.Skipf("Skipping test: example config not found")
-				}
-				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
-				if err != nil {
-					t.Fatalf("Failed to copy example config: %v", err)
-				}
-			}
+			withSecretsConfigPath(t, writeSecretsTestConfig(t, tempDir))
+			withMockSecretsManager(t, &testutils.MockSSMClient{Parameters: tt.parameters})
 
-			// Set up command
-			cmd := secretsListCmd
-			args := []string{}
-			if tt.configFile != "" {
-				args = append(args, "--config", filepath.Join(tempDir, tt.configFile))
-			}
-			if tt.layerPath != "" {
-				args = append(args, tt.layerPath)
-			}
-			cmd.SetArgs(args)
-
-			// Execute command
-			err = cmd.Execute()
+			err = runSecretsList(secretsListCmd, []string{tt.layerPath})
 
 			if tt.expectError {
 				if err == nil {
@@ -112,61 +135,99 @@ func TestSecretsList(t *testing.T) {
 				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("SecretsList() error message '%s' does not contain '%s'", err.Error(), tt.errorMsg)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("SecretsList() expected no error but got: %v", err)
-				}
+			} else if err != nil {
+				t.Errorf("SecretsList() expected no error but got: %v", err)
 			}
 		})
 	}
 }
 
-func TestSecretsGet(t *testing.T) {
-	t.Skip("Skipping TestSecretsGet - commands not executing correctly in test environment")
+func TestSecretsList_ConfigNotFound(t *testing.T) {
+	tempDir, err := testutils.CreateTempDir()
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() {
+		if err := testutils.CleanupTempDir(tempDir); err != nil {
+			t.Logf("Warning: failed to cleanup temp dir: %v", err)
+		}
+	}()
 
+	withSecretsConfigPath(t, filepath.Join(tempDir, "non-existent.yaml"))
+	withMockSecretsManager(t, &testutils.MockSSMClient{})
+
+	err = runSecretsList(secretsListCmd, []string{"base/dev"})
+	if err == nil {
+		t.Fatal("SecretsList() expected error but got nil")
+	}
+	if !strings.Contains(err.Error(), "config file not found") {
+		t.Errorf("SecretsList() error = %q, want it to contain %q", err.Error(), "config file not found")
+	}
+}
+
+// TestSecretsList_DisabledLayer verifies that when secrets are disabled for a layer, the runner
+// exits successfully (nil error) without calling the manager at all.
+func TestSecretsList_DisabledLayer(t *testing.T) {
+	tempDir, err := testutils.CreateTempDir()
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() {
+		if err := testutils.CleanupTempDir(tempDir); err != nil {
+			t.Logf("Warning: failed to cleanup temp dir: %v", err)
+		}
+	}()
+
+	disabledYAML := `
+infrastructure:
+  client: "test-client"
+  company: "gcl"
+  region: "us-east-1"
+  version: "v1.0.0"
+  enable_secrets: false
+  environments:
+    dev:
+      name: "Development"
+      dir_name: "dev"
+      aws_account: "123456789012"
+`
+	path := filepath.Join(tempDir, "gocloud.yaml")
+	if err := os.WriteFile(path, []byte(disabledYAML), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	withSecretsConfigPath(t, path)
+	withMockSecretsManager(t, &testutils.MockSSMClient{})
+
+	if err := runSecretsList(secretsListCmd, []string{"base/dev"}); err != nil {
+		t.Errorf("SecretsList() with secrets disabled expected nil error but got: %v", err)
+	}
+}
+
+func TestSecretsGet(t *testing.T) {
 	tests := []struct {
 		name        string
 		layerPath   string
 		secretKey   string
-		configFile  string
+		parameters  map[string]string
 		expectError bool
 		errorMsg    string
 	}{
 		{
-			name:        "get secret from base layer",
-			layerPath:   "base/dev",
-			secretKey:   "api_key",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
+			name:       "get secret from base layer",
+			layerPath:  "base/dev",
+			secretKey:  "api_key",
+			parameters: map[string]string{"/terraform/gcl-dev-base": `{"api_key":"secret123"}`},
 		},
 		{
-			name:        "get secret from foundation layer",
-			layerPath:   "foundation/dev",
-			secretKey:   "database_url",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
-		},
-		{
-			name:        "get non-existent secret",
-			layerPath:   "base/dev",
-			secretKey:   "non-existent-key",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: true,
-			errorMsg:    "secret not found",
-		},
-		{
-			name:        "get secret without key",
-			layerPath:   "base/dev",
-			secretKey:   "",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: true,
-			errorMsg:    "secret key is required",
+			name:       "get secret from foundation layer",
+			layerPath:  "foundation/dev",
+			secretKey:  "database_url",
+			parameters: map[string]string{"/terraform/gcl-dev-foundation": `{"database_url":"postgres://localhost/db"}`},
 		},
 		{
 			name:        "get secret with invalid layer path",
 			layerPath:   "invalid/layer",
 			secretKey:   "api_key",
-			configFile:  "gocloud-example-config.yaml",
 			expectError: true,
 			errorMsg:    "invalid layer path",
 		},
@@ -174,7 +235,6 @@ func TestSecretsGet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory
 			tempDir, err := testutils.CreateTempDir()
 			if err != nil {
 				t.Fatalf("Failed to create temp dir: %v", err)
@@ -185,34 +245,10 @@ func TestSecretsGet(t *testing.T) {
 				}
 			}()
 
-			// Copy example config if needed
-			if tt.configFile == "gocloud-example-config.yaml" {
-				exampleConfig, err := os.ReadFile("gocloud-example-config.yaml")
-				if err != nil {
-					t.Skipf("Skipping test: example config not found")
-				}
-				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
-				if err != nil {
-					t.Fatalf("Failed to copy example config: %v", err)
-				}
-			}
+			withSecretsConfigPath(t, writeSecretsTestConfig(t, tempDir))
+			withMockSecretsManager(t, &testutils.MockSSMClient{Parameters: tt.parameters})
 
-			// Set up command
-			cmd := secretsGetCmd
-			args := []string{}
-			if tt.configFile != "" {
-				args = append(args, "--config", filepath.Join(tempDir, tt.configFile))
-			}
-			if tt.layerPath != "" {
-				args = append(args, tt.layerPath)
-			}
-			if tt.secretKey != "" {
-				args = append(args, tt.secretKey)
-			}
-			cmd.SetArgs(args)
-
-			// Execute command
-			err = cmd.Execute()
+			err = runSecretsGet(secretsGetCmd, []string{tt.layerPath, tt.secretKey})
 
 			if tt.expectError {
 				if err == nil {
@@ -220,24 +256,19 @@ func TestSecretsGet(t *testing.T) {
 				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("SecretsGet() error message '%s' does not contain '%s'", err.Error(), tt.errorMsg)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("SecretsGet() expected no error but got: %v", err)
-				}
+			} else if err != nil {
+				t.Errorf("SecretsGet() expected no error but got: %v", err)
 			}
 		})
 	}
 }
 
 func TestSecretsSet(t *testing.T) {
-	t.Skip("Skipping TestSecretsSet - commands not executing correctly in test environment")
-
 	tests := []struct {
 		name        string
 		layerPath   string
 		secretKey   string
 		secretValue string
-		configFile  string
 		expectError bool
 		errorMsg    string
 	}{
@@ -246,41 +277,18 @@ func TestSecretsSet(t *testing.T) {
 			layerPath:   "base/dev",
 			secretKey:   "api_key",
 			secretValue: "secret-value",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
 		},
 		{
 			name:        "set secret in foundation layer",
 			layerPath:   "foundation/dev",
 			secretKey:   "database_url",
 			secretValue: "postgresql://user:pass@localhost/db",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
-		},
-		{
-			name:        "set secret without value",
-			layerPath:   "base/dev",
-			secretKey:   "api_key",
-			secretValue: "",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: true,
-			errorMsg:    "secret value is required",
-		},
-		{
-			name:        "set secret without key",
-			layerPath:   "base/dev",
-			secretKey:   "",
-			secretValue: "secret-value",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: true,
-			errorMsg:    "secret key is required",
 		},
 		{
 			name:        "set secret with invalid layer path",
 			layerPath:   "invalid/layer",
 			secretKey:   "api_key",
 			secretValue: "secret-value",
-			configFile:  "gocloud-example-config.yaml",
 			expectError: true,
 			errorMsg:    "invalid layer path",
 		},
@@ -288,7 +296,6 @@ func TestSecretsSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory
 			tempDir, err := testutils.CreateTempDir()
 			if err != nil {
 				t.Fatalf("Failed to create temp dir: %v", err)
@@ -299,37 +306,11 @@ func TestSecretsSet(t *testing.T) {
 				}
 			}()
 
-			// Copy example config if needed
-			if tt.configFile == "gocloud-example-config.yaml" {
-				exampleConfig, err := os.ReadFile("gocloud-example-config.yaml")
-				if err != nil {
-					t.Skipf("Skipping test: example config not found")
-				}
-				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
-				if err != nil {
-					t.Fatalf("Failed to copy example config: %v", err)
-				}
-			}
+			withSecretsConfigPath(t, writeSecretsTestConfig(t, tempDir))
+			mockClient := &testutils.MockSSMClient{}
+			withMockSecretsManager(t, mockClient)
 
-			// Set up command
-			cmd := secretsSetCmd
-			args := []string{}
-			if tt.configFile != "" {
-				args = append(args, "--config", filepath.Join(tempDir, tt.configFile))
-			}
-			if tt.layerPath != "" {
-				args = append(args, tt.layerPath)
-			}
-			if tt.secretKey != "" {
-				args = append(args, tt.secretKey)
-			}
-			if tt.secretValue != "" {
-				args = append(args, tt.secretValue)
-			}
-			cmd.SetArgs(args)
-
-			// Execute command
-			err = cmd.Execute()
+			err = runSecretsSet(secretsSetCmd, []string{tt.layerPath, tt.secretKey, tt.secretValue})
 
 			if tt.expectError {
 				if err == nil {
@@ -337,61 +318,53 @@ func TestSecretsSet(t *testing.T) {
 				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("SecretsSet() error message '%s' does not contain '%s'", err.Error(), tt.errorMsg)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("SecretsSet() expected no error but got: %v", err)
-				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("SecretsSet() expected no error but got: %v", err)
+			}
+
+			// Verify the value was actually written to the mock SSM parameter.
+			layer, lerr := secrets.ParseLayerPath(tt.layerPath, mustLoadSecretsTestConfig(t, tempDir))
+			if lerr != nil {
+				t.Fatalf("ParseLayerPath: %v", lerr)
+			}
+			stored, ok := mockClient.Parameters[layer.SSMParameter]
+			if !ok {
+				t.Fatalf("SecretsSet() did not write parameter %q", layer.SSMParameter)
+			}
+			if !strings.Contains(stored, tt.secretValue) {
+				t.Errorf("stored parameter %q does not contain value %q", stored, tt.secretValue)
 			}
 		})
 	}
 }
 
 func TestSecretsDelete(t *testing.T) {
-	t.Skip("Skipping TestSecretsDelete - commands not executing correctly in test environment")
-
 	tests := []struct {
 		name        string
 		layerPath   string
 		secretKey   string
-		configFile  string
+		parameters  map[string]string
 		expectError bool
 		errorMsg    string
 	}{
 		{
-			name:        "delete secret from base layer",
-			layerPath:   "base/dev",
-			secretKey:   "api_key",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
+			name:       "delete secret from base layer",
+			layerPath:  "base/dev",
+			secretKey:  "api_key",
+			parameters: map[string]string{"/terraform/gcl-dev-base": `{"api_key":"secret123"}`},
 		},
 		{
-			name:        "delete secret from foundation layer",
-			layerPath:   "foundation/dev",
-			secretKey:   "database_url",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
-		},
-		{
-			name:        "delete non-existent secret",
-			layerPath:   "base/dev",
-			secretKey:   "non-existent-key",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: true,
-			errorMsg:    "secret not found",
-		},
-		{
-			name:        "delete secret without key",
-			layerPath:   "base/dev",
-			secretKey:   "",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: true,
-			errorMsg:    "secret key is required",
+			name:       "delete secret from foundation layer",
+			layerPath:  "foundation/dev",
+			secretKey:  "database_url",
+			parameters: map[string]string{"/terraform/gcl-dev-foundation": `{"database_url":"postgres://localhost/db"}`},
 		},
 		{
 			name:        "delete secret with invalid layer path",
 			layerPath:   "invalid/layer",
 			secretKey:   "api_key",
-			configFile:  "gocloud-example-config.yaml",
 			expectError: true,
 			errorMsg:    "invalid layer path",
 		},
@@ -399,7 +372,6 @@ func TestSecretsDelete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory
 			tempDir, err := testutils.CreateTempDir()
 			if err != nil {
 				t.Fatalf("Failed to create temp dir: %v", err)
@@ -410,34 +382,11 @@ func TestSecretsDelete(t *testing.T) {
 				}
 			}()
 
-			// Copy example config if needed
-			if tt.configFile == "gocloud-example-config.yaml" {
-				exampleConfig, err := os.ReadFile("gocloud-example-config.yaml")
-				if err != nil {
-					t.Skipf("Skipping test: example config not found")
-				}
-				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
-				if err != nil {
-					t.Fatalf("Failed to copy example config: %v", err)
-				}
-			}
+			withSecretsConfigPath(t, writeSecretsTestConfig(t, tempDir))
+			mockClient := &testutils.MockSSMClient{Parameters: tt.parameters}
+			withMockSecretsManager(t, mockClient)
 
-			// Set up command
-			cmd := secretsDeleteCmd
-			args := []string{}
-			if tt.configFile != "" {
-				args = append(args, "--config", filepath.Join(tempDir, tt.configFile))
-			}
-			if tt.layerPath != "" {
-				args = append(args, tt.layerPath)
-			}
-			if tt.secretKey != "" {
-				args = append(args, tt.secretKey)
-			}
-			cmd.SetArgs(args)
-
-			// Execute command
-			err = cmd.Execute()
+			err = runSecretsDelete(secretsDeleteCmd, []string{tt.layerPath, tt.secretKey})
 
 			if tt.expectError {
 				if err == nil {
@@ -445,48 +394,31 @@ func TestSecretsDelete(t *testing.T) {
 				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("SecretsDelete() error message '%s' does not contain '%s'", err.Error(), tt.errorMsg)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("SecretsDelete() expected no error but got: %v", err)
-				}
+				return
+			}
+			if err != nil {
+				t.Errorf("SecretsDelete() expected no error but got: %v", err)
 			}
 		})
 	}
 }
 
 func TestSecretsEdit(t *testing.T) {
-	t.Skip("Skipping TestSecretsEdit - requires interactive input")
-
 	tests := []struct {
 		name        string
 		layerPath   string
-		configFile  string
+		skipReason  string
 		expectError bool
 		errorMsg    string
 	}{
 		{
-			name:        "edit secrets for base layer",
-			layerPath:   "base/dev",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
-		},
-		{
-			name:        "edit secrets for foundation layer",
-			layerPath:   "foundation/dev",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: false,
-		},
-		{
-			name:        "edit secrets without layer path",
-			layerPath:   "",
-			configFile:  "gocloud-example-config.yaml",
-			expectError: true,
-			errorMsg:    "layer path is required",
+			name:       "edit secrets for base layer",
+			layerPath:  "base/dev",
+			skipReason: "requires an interactive text editor process, out of scope for a hermetic test",
 		},
 		{
 			name:        "edit secrets with invalid layer path",
 			layerPath:   "invalid/layer",
-			configFile:  "gocloud-example-config.yaml",
 			expectError: true,
 			errorMsg:    "invalid layer path",
 		},
@@ -494,7 +426,10 @@ func TestSecretsEdit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory
+			if tt.skipReason != "" {
+				t.Skip(tt.skipReason)
+			}
+
 			tempDir, err := testutils.CreateTempDir()
 			if err != nil {
 				t.Fatalf("Failed to create temp dir: %v", err)
@@ -505,31 +440,10 @@ func TestSecretsEdit(t *testing.T) {
 				}
 			}()
 
-			// Copy example config if needed
-			if tt.configFile == "gocloud-example-config.yaml" {
-				exampleConfig, err := os.ReadFile("gocloud-example-config.yaml")
-				if err != nil {
-					t.Skipf("Skipping test: example config not found")
-				}
-				err = os.WriteFile(filepath.Join(tempDir, "gocloud-example-config.yaml"), exampleConfig, 0644)
-				if err != nil {
-					t.Fatalf("Failed to copy example config: %v", err)
-				}
-			}
+			withSecretsConfigPath(t, writeSecretsTestConfig(t, tempDir))
+			withMockSecretsManager(t, &testutils.MockSSMClient{})
 
-			// Set up command
-			cmd := secretsEditCmd
-			args := []string{}
-			if tt.configFile != "" {
-				args = append(args, "--config", filepath.Join(tempDir, tt.configFile))
-			}
-			if tt.layerPath != "" {
-				args = append(args, tt.layerPath)
-			}
-			cmd.SetArgs(args)
-
-			// Execute command
-			err = cmd.Execute()
+			err = runSecretsEdit(secretsEditCmd, []string{tt.layerPath})
 
 			if tt.expectError {
 				if err == nil {
@@ -537,13 +451,25 @@ func TestSecretsEdit(t *testing.T) {
 				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("SecretsEdit() error message '%s' does not contain '%s'", err.Error(), tt.errorMsg)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("SecretsEdit() expected no error but got: %v", err)
-				}
+			} else if err != nil {
+				t.Errorf("SecretsEdit() expected no error but got: %v", err)
 			}
 		})
 	}
+}
+
+// mustLoadSecretsTestConfig re-parses the config written by writeSecretsTestConfig, for tests
+// that need the *models.Config to compute the expected SSM parameter name.
+func mustLoadSecretsTestConfig(t *testing.T, tempDir string) *models.Config {
+	t.Helper()
+	original := secretsConfig
+	secretsConfig = filepath.Join(tempDir, "gocloud.yaml")
+	defer func() { secretsConfig = original }()
+	cfg, err := loadSecretsConfig()
+	if err != nil {
+		t.Fatalf("loadSecretsConfig: %v", err)
+	}
+	return cfg
 }
 
 // TestShouldGenerateSecretsForPath_MapInterfaceFormat documents that shouldGenerateSecretsForPath

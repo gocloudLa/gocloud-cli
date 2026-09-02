@@ -1,9 +1,11 @@
 package secrets
 
 import (
+	"errors"
 	"testing"
 
 	"gocloud-cli/internal/models"
+	"gocloud-cli/internal/testutils"
 )
 
 // minimalSOPSConfig returns a config valid for NewSOPSManager with one environment.
@@ -80,6 +82,94 @@ func TestEnsureAllKMSKeys_WhenKeyDoesNotExist_AndCreateFalse_CompletesWithoutErr
 	err = m.EnsureAllKMSKeys([]string{"lab"}, false)
 	if err != nil {
 		t.Errorf("EnsureAllKMSKeys when key does not exist and createIfMissing=false: %v", err)
+	}
+}
+
+// TestCheckKMSKey_WithMockClient_KeyExists exercises the real checkKMSKey AWS-call path
+// (previously unreachable in tests since testCheckKMSKeyFunc always bypassed it) using an
+// injected MockKMSClient via NewSOPSManagerWithClient.
+func TestCheckKMSKey_WithMockClient_KeyExists(t *testing.T) {
+	config := minimalSOPSConfig("lab")
+	mockClient := &testutils.MockKMSClient{
+		Keys: map[string]string{"alias/gcl-lab-secrets": "key-999"},
+	}
+	m, err := NewSOPSManagerWithClient(config, ".", mockClient)
+	if err != nil {
+		t.Fatalf("NewSOPSManagerWithClient: %v", err)
+	}
+
+	exists, keyId, err := m.checkKMSKey("lab")
+	if err != nil {
+		t.Fatalf("checkKMSKey: %v", err)
+	}
+	if !exists {
+		t.Error("checkKMSKey() exists = false, want true")
+	}
+	if keyId != "key-999" {
+		t.Errorf("checkKMSKey() keyId = %q, want %q", keyId, "key-999")
+	}
+}
+
+// TestCheckKMSKey_WithMockClient_NotFound verifies checkKMSKey returns (false, "", nil) when
+// the KMS alias does not exist (mock DescribeKey returns NotFoundException).
+func TestCheckKMSKey_WithMockClient_NotFound(t *testing.T) {
+	config := minimalSOPSConfig("lab")
+	mockClient := &testutils.MockKMSClient{}
+	m, err := NewSOPSManagerWithClient(config, ".", mockClient)
+	if err != nil {
+		t.Fatalf("NewSOPSManagerWithClient: %v", err)
+	}
+
+	exists, keyId, err := m.checkKMSKey("lab")
+	if err != nil {
+		t.Fatalf("checkKMSKey: %v", err)
+	}
+	if exists {
+		t.Error("checkKMSKey() exists = true, want false")
+	}
+	if keyId != "" {
+		t.Errorf("checkKMSKey() keyId = %q, want empty", keyId)
+	}
+}
+
+// TestCheckKMSKey_WithMockClient_OtherError verifies checkKMSKey propagates unexpected errors
+// (i.e. not a NotFound-style error) from DescribeKey.
+func TestCheckKMSKey_WithMockClient_OtherError(t *testing.T) {
+	config := minimalSOPSConfig("lab")
+	mockClient := &testutils.MockKMSClient{
+		DescribeKeyError: errors.New("AccessDenied: not authorized"),
+	}
+	m, err := NewSOPSManagerWithClient(config, ".", mockClient)
+	if err != nil {
+		t.Fatalf("NewSOPSManagerWithClient: %v", err)
+	}
+
+	_, _, err = m.checkKMSKey("lab")
+	if err == nil {
+		t.Fatal("checkKMSKey() expected error but got nil")
+	}
+}
+
+// TestEnsureKMSKey_WithMockClient_CreatesKeyAndAlias exercises the real key-creation path
+// (CreateKey + CreateAlias) via an injected MockKMSClient, previously unreachable in tests.
+func TestEnsureKMSKey_WithMockClient_CreatesKeyAndAlias(t *testing.T) {
+	config := minimalSOPSConfig("lab")
+	mockClient := &testutils.MockKMSClient{NextKeyID: "new-key-id"}
+	m, err := NewSOPSManagerWithClient(config, ".", mockClient)
+	if err != nil {
+		t.Fatalf("NewSOPSManagerWithClient: %v", err)
+	}
+
+	if err := m.ensureKMSKey("lab"); err != nil {
+		t.Fatalf("ensureKMSKey: %v", err)
+	}
+
+	gotKeyId, exists := mockClient.Keys["alias/gcl-lab-secrets"]
+	if !exists {
+		t.Fatal("ensureKMSKey() did not create alias 'alias/gcl-lab-secrets'")
+	}
+	if gotKeyId != "new-key-id" {
+		t.Errorf("created alias key id = %q, want %q", gotKeyId, "new-key-id")
 	}
 }
 

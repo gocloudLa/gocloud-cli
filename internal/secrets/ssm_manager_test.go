@@ -1,7 +1,9 @@
 package secrets
 
 import (
+	"errors"
 	"gocloud-cli/internal/models"
+	"gocloud-cli/internal/testutils"
 	"strings"
 	"testing"
 )
@@ -298,6 +300,103 @@ func TestFormatCredentialError(t *testing.T) {
 	if got2 != want {
 		t.Errorf("formatCredentialError(&Layer{}) = %q, want %q", got2, want)
 	}
+}
+
+// TestManagerWithMockClient exercises Manager's SSM-calling methods against an injected
+// testutils.MockSSMClient via NewManagerWithClient, covering the AWS-call paths that were
+// previously unreachable in tests (no way to inject a client before this seam existed).
+func TestManagerWithMockClient(t *testing.T) {
+	config := &models.Config{
+		Infrastructure: &models.InfrastructureConfig{
+			Client:  "test-client",
+			Company: "gcl",
+			Region:  "us-east-1",
+			Environments: map[string]models.Environment{
+				"dev": {
+					Name:       "Development",
+					DirName:    "dev",
+					AWSAccount: "123456789012",
+				},
+			},
+		},
+	}
+
+	layer, err := ParseLayerPath("base/dev", config)
+	if err != nil {
+		t.Fatalf("ParseLayerPath: %v", err)
+	}
+
+	t.Run("InitSecrets then SetSecret/GetSecret/DeleteSecret round-trip", func(t *testing.T) {
+		mockClient := &testutils.MockSSMClient{}
+		m := NewManagerWithClient(config, mockClient)
+
+		if err := m.InitSecrets(layer); err != nil {
+			t.Fatalf("InitSecrets: %v", err)
+		}
+
+		status, err := m.CheckSecrets(layer)
+		if err != nil || status != "EXISTS" {
+			t.Fatalf("CheckSecrets() after init = (%q, %v), want (EXISTS, nil)", status, err)
+		}
+
+		if err := m.SetSecret(layer, "api_key", "secret-value"); err != nil {
+			t.Fatalf("SetSecret: %v", err)
+		}
+
+		value, err := m.GetSecret(layer, "api_key")
+		if err != nil {
+			t.Fatalf("GetSecret: %v", err)
+		}
+		if value != "secret-value" {
+			t.Errorf("GetSecret() = %v, want %q", value, "secret-value")
+		}
+
+		if err := m.DeleteSecret(layer, "api_key"); err != nil {
+			t.Fatalf("DeleteSecret: %v", err)
+		}
+		if _, err := m.GetSecret(layer, "api_key"); err == nil {
+			t.Error("GetSecret() after delete expected error but got nil")
+		}
+	})
+
+	t.Run("CheckSecrets returns NOT_FOUND when parameter is missing", func(t *testing.T) {
+		mockClient := &testutils.MockSSMClient{}
+		m := NewManagerWithClient(config, mockClient)
+
+		status, err := m.CheckSecrets(layer)
+		if err != nil {
+			t.Fatalf("CheckSecrets: %v", err)
+		}
+		if status != "NOT_FOUND" {
+			t.Errorf("CheckSecrets() = %q, want NOT_FOUND", status)
+		}
+	})
+
+	t.Run("ListSecrets propagates credential errors", func(t *testing.T) {
+		mockClient := &testutils.MockSSMClient{Error: errors.New("AccessDenied: not authorized")}
+		m := NewManagerWithClient(config, mockClient)
+
+		_, err := m.ListSecrets(layer)
+		if err == nil {
+			t.Fatal("ListSecrets() expected error but got nil")
+		}
+		if err.Error() != formatCredentialError(layer) {
+			t.Errorf("ListSecrets() error = %q, want %q", err.Error(), formatCredentialError(layer))
+		}
+	})
+
+	t.Run("GetSecret on non-existent parameter returns ParameterNotFound error", func(t *testing.T) {
+		mockClient := &testutils.MockSSMClient{}
+		m := NewManagerWithClient(config, mockClient)
+
+		_, err := m.GetSecret(layer, "missing-key")
+		if err == nil {
+			t.Fatal("GetSecret() expected error but got nil")
+		}
+		if !strings.Contains(err.Error(), "ParameterNotFound") {
+			t.Errorf("GetSecret() error = %q, want it to contain %q", err.Error(), "ParameterNotFound")
+		}
+	})
 }
 
 func TestListSecrets(t *testing.T) {

@@ -18,6 +18,11 @@ import (
 
 var errSecretsDisabled = errors.New("secrets disabled")
 
+// newSecretsManagerForLayer is a seam over secrets.NewManagerForLayer. Tests override this
+// package var to inject a mock-backed manager (e.g. via secrets.NewManagerWithClient) instead
+// of hitting real AWS, and restore it afterwards.
+var newSecretsManagerForLayer = secrets.NewManagerForLayer
+
 var (
 	secretsConfig   string
 	secretsCheckAll bool
@@ -550,7 +555,7 @@ func getSecretsManagerAndLayer(layerPath string) (*models.Config, secrets.Secret
 	if !checkSecretsEnabledSilent(cfg, layerPath) {
 		return nil, nil, nil, errSecretsDisabled
 	}
-	manager, err := secrets.NewManagerForLayer(cfg, layerPath, getSecretsWorkingDir())
+	manager, err := newSecretsManagerForLayer(cfg, layerPath, getSecretsWorkingDir())
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize secrets manager: %w", err)
 	}

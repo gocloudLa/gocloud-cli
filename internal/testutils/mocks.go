@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
@@ -76,6 +78,74 @@ func (m *MockSSMClient) DeleteParameter(ctx context.Context, params *ssm.DeleteP
 
 	delete(m.Parameters, *params.Name)
 	return &ssm.DeleteParameterOutput{}, nil
+}
+
+// MockKMSClient is a mock implementation of the KMS client used by internal/secrets.SOPSManager.
+// Keys maps a KMS alias (e.g. "alias/client-env-secrets") to a key ID, simulating existing
+// aliases/keys in AWS. NextKeyID is the key ID returned by CreateKey (defaults to "mock-key-id").
+type MockKMSClient struct {
+	Keys      map[string]string
+	NextKeyID string
+
+	DescribeKeyError         error
+	CreateKeyError           error
+	CreateAliasError         error
+	ScheduleKeyDeletionError error
+}
+
+func (m *MockKMSClient) DescribeKey(ctx context.Context, params *kms.DescribeKeyInput, optFns ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
+	if m.DescribeKeyError != nil {
+		return nil, m.DescribeKeyError
+	}
+
+	keyId, exists := m.Keys[*params.KeyId]
+	if !exists {
+		return nil, &kmstypes.NotFoundException{Message: aws.String("Alias not found")}
+	}
+
+	return &kms.DescribeKeyOutput{
+		KeyMetadata: &kmstypes.KeyMetadata{
+			KeyId: aws.String(keyId),
+		},
+	}, nil
+}
+
+func (m *MockKMSClient) CreateKey(ctx context.Context, params *kms.CreateKeyInput, optFns ...func(*kms.Options)) (*kms.CreateKeyOutput, error) {
+	if m.CreateKeyError != nil {
+		return nil, m.CreateKeyError
+	}
+
+	keyId := m.NextKeyID
+	if keyId == "" {
+		keyId = "mock-key-id"
+	}
+
+	return &kms.CreateKeyOutput{
+		KeyMetadata: &kmstypes.KeyMetadata{
+			KeyId: aws.String(keyId),
+		},
+	}, nil
+}
+
+func (m *MockKMSClient) CreateAlias(ctx context.Context, params *kms.CreateAliasInput, optFns ...func(*kms.Options)) (*kms.CreateAliasOutput, error) {
+	if m.CreateAliasError != nil {
+		return nil, m.CreateAliasError
+	}
+
+	if m.Keys == nil {
+		m.Keys = make(map[string]string)
+	}
+	m.Keys[*params.AliasName] = *params.TargetKeyId
+
+	return &kms.CreateAliasOutput{}, nil
+}
+
+func (m *MockKMSClient) ScheduleKeyDeletion(ctx context.Context, params *kms.ScheduleKeyDeletionInput, optFns ...func(*kms.Options)) (*kms.ScheduleKeyDeletionOutput, error) {
+	if m.ScheduleKeyDeletionError != nil {
+		return nil, m.ScheduleKeyDeletionError
+	}
+
+	return &kms.ScheduleKeyDeletionOutput{}, nil
 }
 
 // MockFileSystem provides mock file system operations
