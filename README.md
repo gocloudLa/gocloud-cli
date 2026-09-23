@@ -486,16 +486,21 @@ infrastructure:
     providers:
       default_providers:
         - name: "aws"
+          region: "local.metadata.aws_region"
+        - name: "aws"
           alias: "org"
           region: "local.metadata.aws_region"
-          assume_role:
-            role_arn: "arn:aws:iam::111111111111:role/OrganizationAccountAccessRole"
         - name: "aws"
           alias: "sec"
           region: "local.metadata.aws_region"
+          # Optional cross account with profile
+          # profile: "demosecurity-sec" 
         - name: "aws"
           alias: "log"
           region: "local.metadata.aws_region"
+          # Opcional: cross account with assume_role
+          # assume_role:
+          #   role_arn: "arn:aws:iam::111111111111:role/OrganizationAccountAccessRole"
         - name: "aws"
           alias: "kms"
           region: "local.metadata.aws_region"
@@ -697,7 +702,7 @@ infrastructure:
 
 **Default behavior:**
 - `type: "s3"` (use `"disabled"` to skip `backend.tf` generation at that scope)
-- `pattern: "s3-backend"`
+- `pattern: "tf-backend"`
 - `region`: inherits `infrastructure.region`
 - `account: "sha"`
 - `encrypt: true`

@@ -1801,10 +1801,14 @@ func (pg *ProjectGenerator) buildBackendTemplateData(layerType, project, env str
 	}
 	if !exists || backendConfig == nil {
 		// Return minimal default if no environment or backend config
+		region := pg.config.Region
+		if region == "" {
+			region = "us-east-1"
+		}
 		return &models.BackendTemplateData{
 			Type:    "s3",
-			Bucket:  fmt.Sprintf("%s-s3-backend", pg.config.Company),
-			Region:  "us-east-1",
+			Bucket:  fmt.Sprintf("%s-sha-tf-backend", pg.config.Company),
+			Region:  region,
 			Encrypt: true,
 		}
 	}
@@ -1920,13 +1924,15 @@ func (pg *ProjectGenerator) buildBackendTemplateData(layerType, project, env str
 		}
 	}
 
-	// Use default values when no global backend config exists
-	region := "us-east-1"
+	region := backendConfig.Region
+	if region == "" {
+		region = pg.config.Region
+	}
+	if region == "" {
+		region = "us-east-1"
+	}
 	encrypt := true
 	if pg.config.Backend != nil {
-		if pg.config.Backend.Region != "" {
-			region = pg.config.Backend.Region
-		}
 		encrypt = pg.config.Backend.Encrypt
 	}
 
@@ -1980,8 +1986,15 @@ func (pg *ProjectGenerator) processRoleTemplate(template, layerType, project, en
 	result = strings.ReplaceAll(result, "{{.Environment}}", env)
 	result = strings.ReplaceAll(result, "{{.EnvironmentName}}", models.EnvironmentNameForBackendKey(env, envConfig))
 	result = strings.ReplaceAll(result, "{{.Company}}", pg.config.Company)
-	result = strings.ReplaceAll(result, "{{.BackendAccount}}", pg.config.Backend.Account)
-	result = strings.ReplaceAll(result, "{{.BackendPattern}}", pg.config.Backend.Pattern)
+	resolvedBackend := models.ResolveBackendConfig(pg.config)
+	backendAccount := ""
+	backendPattern := ""
+	if resolvedBackend != nil {
+		backendAccount = resolvedBackend.Account
+		backendPattern = resolvedBackend.Pattern
+	}
+	result = strings.ReplaceAll(result, "{{.BackendAccount}}", backendAccount)
+	result = strings.ReplaceAll(result, "{{.BackendPattern}}", backendPattern)
 	result = strings.ReplaceAll(result, "{{.Region}}", pg.config.Region)
 	result = strings.ReplaceAll(result, "{{.Client}}", pg.config.Client)
 	return result

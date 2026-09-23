@@ -250,7 +250,7 @@ func createInteractiveConfig(projectName string) (*models.Config, error) {
 		config.Infrastructure.Backend = &models.BackendInfrastructureConfig{}
 
 		// Backend Pattern
-		pattern, err := utils.PromptWithDefault("Backend Pattern", "s3-backend")
+		pattern, err := utils.PromptWithDefault("Backend Pattern", "tf-backend")
 		if err != nil {
 			return nil, err
 		}
@@ -359,7 +359,7 @@ func createInteractiveConfig(projectName string) (*models.Config, error) {
 		}
 		if useOrgBackend {
 			config.Infrastructure.Organization.Backend = &models.BackendInfrastructureConfig{}
-			backendPattern, err := utils.PromptWithDefault("Backend pattern", "s3-backend")
+			backendPattern, err := utils.PromptWithDefault("Backend pattern", "tf-backend")
 			if err != nil {
 				return nil, err
 			}
