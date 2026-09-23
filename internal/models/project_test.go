@@ -711,6 +711,87 @@ func TestCalculateDependencies_ProjectDependsOn(t *testing.T) {
 	}
 }
 
+func TestCalculateDependencies_DisabledLayers(t *testing.T) {
+	ges := Environment{
+		Name:       "Sistema Integral de Gestion Electoral Shared",
+		DirName:    "ges",
+		AWSAccount: "059440671824",
+		Layers: &LayerConfig{
+			Base:       ptrBool(false),
+			Foundation: ptrBool(false),
+		},
+		Projects: []interface{}{"common"},
+	}
+
+	onlyCommon := &InfrastructureConfig{
+		Environments: map[string]Environment{"ges": ges},
+	}
+	if got := CalculateDependencies("project", "common", "ges", onlyCommon); len(got) != 0 {
+		t.Errorf("project with base and foundation disabled = %v, want none", got)
+	}
+	if got := CalculateDependencies("foundation", "", "ges", onlyCommon); len(got) != 0 {
+		t.Errorf("foundation with base disabled = %v, want none", got)
+	}
+
+	baseOnly := &InfrastructureConfig{
+		Environments: map[string]Environment{
+			"ges": {
+				DirName: "ges",
+				Layers: &LayerConfig{
+					Base:       ptrBool(true),
+					Foundation: ptrBool(false),
+				},
+				Projects: []interface{}{"common"},
+			},
+		},
+	}
+	got := CalculateDependencies("project", "common", "ges", baseOnly)
+	want := []string{"../../../base/ges"}
+	if len(got) != 1 || got[0] != want[0] {
+		t.Errorf("project with only base = %v, want %v", got, want)
+	}
+
+	foundationOnly := &InfrastructureConfig{
+		Environments: map[string]Environment{
+			"ges": {
+				DirName: "ges",
+				Layers:  &LayerConfig{Base: ptrBool(false)},
+				Projects: []interface{}{
+					ProjectItem{Key: "common", DependsOn: []string{"foundation", "base"}},
+				},
+			},
+		},
+	}
+	got = CalculateDependencies("project", "common", "ges", foundationOnly)
+	want = []string{"../../../foundation/ges"}
+	if len(got) != 1 || got[0] != want[0] {
+		t.Errorf("explicit deps with base disabled = %v, want %v", got, want)
+	}
+
+	globalOff := &InfrastructureConfig{
+		Layers: &LayerConfig{Foundation: ptrBool(false)},
+		Environments: map[string]Environment{
+			"ges": {
+				DirName:  "ges",
+				Projects: []interface{}{"common"},
+				Workloads: []interface{}{
+					WorkloadItem{Key: "api", DependsOn: []string{"foundation", "project/common"}},
+				},
+			},
+		},
+	}
+	got = CalculateDependencies("project", "common", "ges", globalOff)
+	want = []string{"../../../base/ges"}
+	if len(got) != 1 || got[0] != want[0] {
+		t.Errorf("global foundation disabled = %v, want %v", got, want)
+	}
+	got = CalculateDependencies("workload", "api", "ges", globalOff)
+	want = []string{"../../../project/common/ges"}
+	if len(got) != 1 || got[0] != want[0] {
+		t.Errorf("workload explicit deps with foundation disabled = %v, want %v", got, want)
+	}
+}
+
 // TestCalculateDependencies_WorkloadDependsOnEmpty ensures workload with depends_on: [] returns no dependencies.
 // Without this, the code only uses explicit deps when len(workloadDeps) > 0, so depends_on: [] falls through to default.
 // We use workload key "core" so that the default would be ../../../project/core/dev; with depends_on: [] we want [].
