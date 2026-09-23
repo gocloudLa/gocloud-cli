@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.11.0...v1.12.0) (2026-09-23)
+
+
+### Features
+
+* **moddeps:** enhance pr_body generation ([#39](https://github.com/gocloudLa/gocloud-cli/issues/39)) ([f1955ab](https://github.com/gocloudLa/gocloud-cli/commit/f1955ab5e993357bba0144bc5bbe7b299ba51837))
+
 ## [1.11.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.10.0...v1.11.0) (2026-09-02)
 
 
