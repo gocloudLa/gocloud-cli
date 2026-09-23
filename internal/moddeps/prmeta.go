@@ -12,6 +12,7 @@ var (
 	upstreamReleaseChoreRe = regexp.MustCompile(`(?i)^chore(\([^)]*\))?\s*:\s*release\b`)
 	conventionalRe         = regexp.MustCompile(`^(?i)(?P<type>feat|fix|perf|refactor|docs|style|test|build|ci|chore|revert)(?P<scope>\([^)]+\))?(?P<bang>!)?:`)
 	prRefSuffixRe          = regexp.MustCompile(`\s*\(#\d+\)\s*$`)
+	unqualifiedIssueRefRe  = regexp.MustCompile(`(^|[^A-Za-z0-9_])#(\d+)\b`)
 )
 
 func upstreamSubjectKept(first string) bool {
@@ -48,21 +49,44 @@ func parseGitHubRepo(sourceURL string) (owner, repo string, ok bool) {
 }
 
 // UpstreamCommitTitles resolves the module GitHub repo from registry metadata and lists compare subjects.
-func (c *Client) UpstreamCommitTitles(ctx context.Context, moduleSource, current, latest string) []string {
+func (c *Client) UpstreamCommitTitles(ctx context.Context, moduleSource, current, latest string) (titles []string, owner, repo string) {
 	parts := strings.Split(moduleSource, "/")
 	if len(parts) != 3 {
-		return nil
+		return nil, "", ""
 	}
 	detail := c.GetModuleVersionDetail(ctx, parts[0], parts[1], parts[2], latest)
 	if detail == nil {
-		return nil
+		return nil, "", ""
 	}
 	srcURL, _ := detail["source"].(string)
 	ghOwner, ghRepo, ok := parseGitHubRepo(srcURL)
 	if !ok {
-		return nil
+		return nil, "", ""
 	}
-	return c.GitHubCompareSubjects(ctx, ghOwner, ghRepo, current, latest)
+	return c.GitHubCompareSubjects(ctx, ghOwner, ghRepo, current, latest), ghOwner, ghRepo
+}
+
+func upstreamCommitLines(subject, owner, repo string) []string {
+	owner = strings.TrimSpace(owner)
+	repo = strings.TrimSpace(repo)
+	if owner == "" || repo == "" {
+		return []string{subject}
+	}
+	matches := unqualifiedIssueRefRe.FindAllStringSubmatch(subject, -1)
+	if len(matches) == 0 {
+		return []string{subject}
+	}
+	lines := make([]string, 0, len(matches))
+	seen := make(map[string]struct{}, len(matches))
+	for _, m := range matches {
+		ref := owner + "/" + repo + "#" + m[2]
+		if _, ok := seen[ref]; ok {
+			continue
+		}
+		seen[ref] = struct{}{}
+		lines = append(lines, ref)
+	}
+	return lines
 }
 
 var scopeLayerAlias = map[string]string{"base": "foundation"}
@@ -242,7 +266,7 @@ type PRMeta struct {
 }
 
 // BuildPRMeta builds squash title/body/marker for a module bump PR.
-func (c *Client) BuildPRMeta(ctx context.Context, moduleSource, current, latest string, paths []string, titles []string) PRMeta {
+func (c *Client) BuildPRMeta(ctx context.Context, moduleSource, current, latest string, paths []string, titles []string, upstreamOwner, upstreamRepo string) PRMeta {
 	parts := strings.Split(moduleSource, "/")
 	sortedPaths := append([]string(nil), paths...)
 	sort.Strings(sortedPaths)
@@ -258,11 +282,18 @@ func (c *Client) BuildPRMeta(ctx context.Context, moduleSource, current, latest 
 	bodyLines = append(bodyLines, "", "### Upstream commits", "")
 
 	if len(parts) == 3 && len(titles) > 0 {
+		seen := make(map[string]struct{})
 		for i, s := range titles {
 			if i >= 30 {
 				break
 			}
-			bodyLines = append(bodyLines, "- "+s)
+			for _, line := range upstreamCommitLines(s, upstreamOwner, upstreamRepo) {
+				if _, ok := seen[line]; ok {
+					continue
+				}
+				seen[line] = struct{}{}
+				bodyLines = append(bodyLines, "- "+line)
+			}
 		}
 	} else if len(parts) == 3 {
 		detail := c.GetModuleVersionDetail(ctx, parts[0], parts[1], parts[2], latest)
