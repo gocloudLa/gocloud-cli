@@ -589,7 +589,9 @@ func CalculateDependencies(layer, project, envKey string, config *Infrastructure
 		// Option 3: Use environment key (fallback) - already set above
 	}
 
-	// Default dependency logic
+	// Default dependency logic. base/foundation targets are included only when
+	// that layer is generated for the environment, so Terragrunt does not depend
+	// on a directory that was never created.
 	switch layer {
 	case "base":
 		return []string{} // base doesn't depend on anything
@@ -598,6 +600,9 @@ func CalculateDependencies(layer, project, envKey string, config *Infrastructure
 	case "security":
 		return []string{} // security is global, no dependencies (like base)
 	case "foundation":
+		if !isEnvLayerEnabled(config, "base", envKey) {
+			return []string{}
+		}
 		return []string{"../../base/" + dirName}
 	case "project":
 		if exists {
@@ -608,21 +613,10 @@ func CalculateDependencies(layer, project, envKey string, config *Infrastructure
 				if !hasExplicitDependsOnProject(projectItem) {
 					break
 				}
-				deps := GetProjectDependencies(projectItem)
-				var out []string
-				for _, dep := range deps {
-					if strings.HasPrefix(dep, "foundation") {
-						out = append(out, "../../../foundation/"+dirName)
-					} else if strings.HasPrefix(dep, "base") {
-						out = append(out, "../../base/"+dirName)
-					} else {
-						out = append(out, dep)
-					}
-				}
-				return out
+				return resolveStackDependencies(GetProjectDependencies(projectItem), envConfig, dirName, config, envKey)
 			}
 		}
-		return []string{"../../../foundation/" + dirName}
+		return defaultProjectDependencies(config, envKey, dirName)
 	case "workload":
 		// Check if there are explicit dependencies for this workload (including depends_on: [] for none)
 		if exists {
@@ -634,29 +628,7 @@ func CalculateDependencies(layer, project, envKey string, config *Infrastructure
 				if !hasExplicitDependsOnWorkload(workloadItem) {
 					break
 				}
-				workloadDeps := GetWorkloadDependencies(workloadItem)
-				// Explicit depends_on: [] means no dependencies
-				var dependencies []string
-				for _, dep := range workloadDeps {
-					if strings.HasPrefix(dep, "project/") {
-						// Convert "project/key" to "../../../project/dirName/envDirName"
-						projectKey := strings.TrimPrefix(dep, "project/")
-						for _, projItem := range envConfig.Projects {
-							if GetProjectKey(projItem) == projectKey {
-								projectDirName := GetProjectDirectoryName(projItem)
-								dependencies = append(dependencies, "../../../project/"+projectDirName+"/"+dirName)
-								break
-							}
-						}
-					} else if strings.HasPrefix(dep, "foundation") {
-						dependencies = append(dependencies, "../../../foundation/"+dirName)
-					} else if strings.HasPrefix(dep, "base") {
-						dependencies = append(dependencies, "../../../base/"+dirName)
-					} else {
-						dependencies = append(dependencies, dep)
-					}
-				}
-				return dependencies
+				return resolveStackDependencies(GetWorkloadDependencies(workloadItem), envConfig, dirName, config, envKey)
 			}
 		}
 
@@ -701,6 +673,80 @@ func CalculateDependencies(layer, project, envKey string, config *Infrastructure
 	default:
 		return []string{}
 	}
+}
+
+// isEnvLayerEnabled reports whether base or foundation is generated for envKey.
+// Environment layers override infrastructure layers; both default to enabled.
+func isEnvLayerEnabled(config *InfrastructureConfig, layer, envKey string) bool {
+	if config == nil {
+		return true
+	}
+	if env, ok := config.Environments[envKey]; ok && env.Layers != nil {
+		switch layer {
+		case "base":
+			if env.Layers.Base != nil {
+				return *env.Layers.Base
+			}
+		case "foundation":
+			if env.Layers.Foundation != nil {
+				return *env.Layers.Foundation
+			}
+		}
+	}
+	if config.Layers != nil {
+		switch layer {
+		case "base":
+			if config.Layers.Base != nil {
+				return *config.Layers.Base
+			}
+		case "foundation":
+			if config.Layers.Foundation != nil {
+				return *config.Layers.Foundation
+			}
+		}
+	}
+	return true
+}
+
+// defaultProjectDependencies is the project-layer chain: foundation, else base, else none.
+func defaultProjectDependencies(config *InfrastructureConfig, envKey, dirName string) []string {
+	if isEnvLayerEnabled(config, "foundation", envKey) {
+		return []string{"../../../foundation/" + dirName}
+	}
+	if isEnvLayerEnabled(config, "base", envKey) {
+		return []string{"../../../base/" + dirName}
+	}
+	return []string{}
+}
+
+// resolveStackDependencies maps symbolic depends_on entries to Terragrunt paths.
+// Entries that name base or foundation are dropped when that layer is not generated.
+// project/<key> is included only when that project exists in the environment.
+func resolveStackDependencies(deps []string, envConfig Environment, dirName string, config *InfrastructureConfig, envKey string) []string {
+	var out []string
+	for _, dep := range deps {
+		switch {
+		case strings.HasPrefix(dep, "project/"):
+			projectKey := strings.TrimPrefix(dep, "project/")
+			for _, projItem := range envConfig.Projects {
+				if GetProjectKey(projItem) == projectKey {
+					out = append(out, "../../../project/"+GetProjectDirectoryName(projItem)+"/"+dirName)
+					break
+				}
+			}
+		case strings.HasPrefix(dep, "foundation"):
+			if isEnvLayerEnabled(config, "foundation", envKey) {
+				out = append(out, "../../../foundation/"+dirName)
+			}
+		case strings.HasPrefix(dep, "base"):
+			if isEnvLayerEnabled(config, "base", envKey) {
+				out = append(out, "../../../base/"+dirName)
+			}
+		default:
+			out = append(out, dep)
+		}
+	}
+	return out
 }
 
 // Helper functions to resolve AWS SSO settings

@@ -1021,11 +1021,11 @@ infrastructure:
 **Default behavior:**
 
 - `base`: depends on nothing
-- `foundation`: depends on `base/{env}`
-- `project/{name}`: depends on `foundation/{env}`
+- `foundation`: depends on `base/{env}` when that environment generates base; otherwise nothing
+- `project/{name}`: depends on the nearest generated layer for that environment — `foundation/{env}`, otherwise `base/{env}`, otherwise nothing
 - `workload/{name}`: depends on `project/{name}/{env}` if that project exists for the environment, otherwise `project/common/{env}` (fallback)
 
-`depends_on` accepts a list of layer paths (e.g. `["foundation"]`, `["project/common", "project/core"]`, or `[]` to clear dependencies).
+`depends_on` accepts a list of layer paths (e.g. `["foundation"]`, `["project/common", "project/core"]`, or `[]` to clear dependencies). Entries that name `base` or `foundation` are omitted when that layer is not generated for the environment (environment `layers` override global `layers`). A `project/<key>` entry is omitted when that project is not in the environment.
 
 **Override scope:**
 
