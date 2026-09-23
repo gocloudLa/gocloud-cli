@@ -286,7 +286,7 @@ gocloud module readme generate-example --template-url https://...gotmpl # Remote
 
 #### `gocloud module deps`
 
-Inspects Terraform dependency pins under a directory tree (default: current working directory; use `--dir` to point elsewhere). Contacts the public Terraform Registry (and the GitHub API when building bump metadata; use `GITHUB_TOKEN` or `GH_TOKEN` for higher rate limits). Plain output lists modules and `required_providers`; `--json` lists **only modules**, matching the first section of the plain report.
+Inspects Terraform dependency pins under a directory tree (default: current working directory; use `--dir` to point elsewhere). Contacts the public Terraform Registry (and the GitHub API when building bump metadata; use `GITHUB_TOKEN` or `GH_TOKEN` for higher rate limits). Plain output lists modules and `required_providers`; `--json` lists **only modules**, matching the first section of the plain report. In `--bump-plan`, each upstream commit in `pr_body` is listed as `owner/repo#123`.
 
 ```bash
 gocloud module deps check                           # Plain text + colored status; exit 1 if any registry module is outdated

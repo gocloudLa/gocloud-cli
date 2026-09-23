@@ -20,6 +20,8 @@ type OutdatedModule struct {
 	Latest               string   `json:"latest"`
 	Paths                []string `json:"paths"`
 	UpstreamCommitTitles []string `json:"upstream_commit_titles"`
+	upstreamOwner        string
+	upstreamRepo         string
 }
 
 // ModuleLineStatus is one row for plain / JSON human-readable module pins (deduped by source).
@@ -100,7 +102,7 @@ func (c *Client) ListOutdatedModules(ctx context.Context, root string) ([]Outdat
 		if latest == "" || CmpVersion(current, latest) >= 0 {
 			continue
 		}
-		titles := c.UpstreamCommitTitles(ctx, source, current, latest)
+		titles, ghOwner, ghRepo := c.UpstreamCommitTitles(ctx, source, current, latest)
 		set := make(map[string]struct{})
 		var uniq []string
 		for _, p := range paths {
@@ -116,6 +118,8 @@ func (c *Client) ListOutdatedModules(ctx context.Context, root string) ([]Outdat
 			Latest:               latest,
 			Paths:                uniq,
 			UpstreamCommitTitles: titles,
+			upstreamOwner:        ghOwner,
+			upstreamRepo:         ghRepo,
 		})
 	}
 	return out, nil
@@ -139,7 +143,7 @@ func (c *Client) BuildBumpPlan(ctx context.Context, root string) (*BumpPlan, err
 	for _, row := range rows {
 		titles := append([]string(nil), row.UpstreamCommitTitles...)
 		for _, p := range row.Paths {
-			meta := c.BuildPRMeta(ctx, row.Source, row.Current, row.Latest, []string{p}, titles)
+			meta := c.BuildPRMeta(ctx, row.Source, row.Current, row.Latest, []string{p}, titles, row.upstreamOwner, row.upstreamRepo)
 			items = append(items, BumpPlanItem{
 				Source:               row.Source,
 				Current:              row.Current,
