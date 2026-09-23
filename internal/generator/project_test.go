@@ -1242,6 +1242,21 @@ func TestProcessRoleTemplate(t *testing.T) {
 	}
 }
 
+func TestProcessRoleTemplate_MissingBackendUsesDefaults(t *testing.T) {
+	config := &models.InfrastructureConfig{
+		Client:  "test-client",
+		Company: "gcl",
+		Region:  "sa-east-1",
+	}
+	pg := NewProjectGenerator(config, "/tmp", false)
+	envConfig := models.Environment{AWSAccount: "112345678903"}
+
+	got := pg.processRoleTemplate("{{.BackendAccount}}-{{.BackendPattern}}", "project", "dept", "prd", envConfig, "112345678903")
+	if got != "sha-tf-backend" {
+		t.Errorf("processRoleTemplate() = %q, want sha-tf-backend", got)
+	}
+}
+
 func TestExtractLayerNameFromContent(t *testing.T) {
 	config := &models.InfrastructureConfig{Company: "gcl"}
 	pg := NewProjectGenerator(config, "/tmp", false)

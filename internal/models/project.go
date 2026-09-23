@@ -752,12 +752,15 @@ func ResolveBackendConfig(config *InfrastructureConfig) *BackendInfrastructureCo
 		if backend.Account == "" {
 			backend.Account = "sha"
 		}
+		if backend.Pattern == "" {
+			backend.Pattern = "tf-backend"
+		}
 		return &backend
 	}
 
 	// Default configuration
 	return &BackendInfrastructureConfig{
-		Pattern: "s3-backend",
+		Pattern: "tf-backend",
 		Region:  config.Region,
 		Account: "sha",
 		Encrypt: true,
@@ -1226,6 +1229,16 @@ func (config *InfrastructureConfig) ResolveBackendConfig(layerType, projectKey, 
 	}
 	if layerType == "security" && config.Security != nil && config.Security.Backend != nil {
 		result = mergeBackendInfrastructureConfigs(result, config.Security.Backend)
+	}
+
+	if result.Pattern == "" {
+		result.Pattern = "tf-backend"
+	}
+	if result.Region == "" {
+		result.Region = config.Region
+	}
+	if result.Account == "" {
+		result.Account = "sha"
 	}
 
 	return result

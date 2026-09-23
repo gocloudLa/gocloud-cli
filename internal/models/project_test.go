@@ -806,7 +806,7 @@ func TestResolveBackendConfig(t *testing.T) {
 				Region: "us-east-1",
 			},
 			expected: &BackendInfrastructureConfig{
-				Pattern: "s3-backend",
+				Pattern: "tf-backend",
 				Region:  "us-east-1",
 				Account: "sha",
 				Encrypt: true,
@@ -837,6 +837,26 @@ func TestResolveBackendConfig(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestResolveBackendConfig_FillsMissingPatternRegionAccount(t *testing.T) {
+	config := &InfrastructureConfig{
+		Company: "gcl",
+		Region:  "sa-east-1",
+		Environments: map[string]Environment{
+			"prd": {AWSAccount: "112345678903"},
+		},
+	}
+	result := config.ResolveBackendConfig("base", "", "prd")
+	if result.Pattern != "tf-backend" {
+		t.Errorf("Pattern = %q, want tf-backend", result.Pattern)
+	}
+	if result.Region != "sa-east-1" {
+		t.Errorf("Region = %q, want sa-east-1", result.Region)
+	}
+	if result.Account != "sha" {
+		t.Errorf("Account = %q, want sha", result.Account)
 	}
 }
 

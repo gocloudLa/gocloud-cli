@@ -51,23 +51,33 @@ infrastructure:
         - name: "aws"
           region: "local.metadata.aws_region"
         - name: "aws"
-          alias: "sha"
+          alias: "org"
           region: "local.metadata.aws_region"
-          assume_role:          
-            role_arn: "arn:aws:iam::123456789012:role/OrganizationAccountAccessRole"
-            session_name: "TerraformSession"
-        # - name: "gitlab"
-  #   secrets:
-  #     type: "sops"
-  #   backend:     # Optional: override backend only for organization/backend.tf (pattern, region, encrypt, profiles/assume_role/lock table, etc.)
-  #     pattern: "org-backend"
-  #     region: "us-east-1"
-  #     encrypt: true
-  #     use_assume_role: false   # Optional: omit assume_role block in backend.tf
-  #     use_lock_table: false    # Optional: omit dynamodb_table in backend.tf
-  #   aws_sso:                      # Optional: override SSO for org profile
-  #     start_url: "https://..."
-  #     role_name: "Admin"
+        - name: "aws"
+          alias: "sec"
+          region: "local.metadata.aws_region"
+          # Optional cross account with profile
+          # profile: "demosecurity-sec" 
+        - name: "aws"
+          alias: "log"
+          region: "local.metadata.aws_region"
+          # Opcional: cross account with assume_role
+          # assume_role:
+          #   role_arn: "arn:aws:iam::111111111111:role/OrganizationAccountAccessRole"
+        - name: "aws"
+          alias: "kms"
+          region: "local.metadata.aws_region"
+    # secrets:
+    #   type: "sops"
+    # backend:     # Optional: override backend only for organization/backend.tf (pattern, region, encrypt, profiles/assume_role/lock table, etc.)
+    #   pattern: "org-backend"
+    #   region: "us-east-1"
+    #   encrypt: true
+    #   use_assume_role: false   # Optional: omit assume_role block in backend.tf
+    #   use_lock_table: false    # Optional: omit dynamodb_table in backend.tf
+    # aws_sso:                      # Optional: override SSO for org profile
+    #   start_url: "https://..."
+    #   role_name: "Admin"
   layers:  # Global layer settings (default: all true)
     base: true
     foundation: true
@@ -76,7 +86,7 @@ infrastructure:
 
   # Default backend settings (commented - uncomment to customize):
   # backend:
-  #   pattern: "s3-backend"
+  #   pattern: "tf-backend"
   #   region: "us-east-1"
   #   account: "sha"
   #   encrypt: true
