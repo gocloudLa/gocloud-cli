@@ -553,6 +553,14 @@ func (pg *ProjectGenerator) CreateProjectStructure() error {
 		}
 	}
 
+	// Create backup directory only if enabled (requires infrastructure.backup.aws_account)
+	if pg.isBackupLayerEnabled() {
+		bakPath := filepath.Join(rootDir, "backup")
+		if err := utils.CreateDirectory(bakPath); err != nil {
+			return err
+		}
+	}
+
 	logger.Info("Project structure created successfully")
 	return nil
 }
@@ -578,6 +586,11 @@ func (pg *ProjectGenerator) GenerateConfigFiles() error {
 
 	// Generate security files
 	if err := pg.generateSecurityConfigs(); err != nil {
+		return err
+	}
+
+	// Generate backup files
+	if err := pg.generateBackupConfigs(); err != nil {
 		return err
 	}
 
@@ -1174,6 +1187,134 @@ func (pg *ProjectGenerator) generateSecurityConfigs() error {
 	return nil
 }
 
+// generateBackupConfigs generates backup-level configuration files (global layer, same pattern as security).
+func (pg *ProjectGenerator) generateBackupConfigs() error {
+	if !pg.isBackupLayerEnabled() {
+		logger.Info("backup layer skipped - disabled or infrastructure.backup.aws_account not set")
+		return nil
+	}
+
+	bakData := pg.buildTemplateData("backup", "")
+
+	metadataContent, err := pg.engine.Render("metadata.tf.tpl", bakData)
+	if err != nil {
+		return err
+	}
+	metadataPath := filepath.Join(pg.workingDir, "backup", "metadata.tf")
+	if err := pg.writeFileWithConfirmation(metadataPath, metadataContent); err != nil {
+		if errors.Is(err, ErrFileSkipped) {
+			logger.Info("backup/metadata.tf skipped by user")
+		} else {
+			return err
+		}
+	}
+
+	mainContent, err := pg.engine.Render("main.tf.backup.tpl", bakData)
+	if err != nil {
+		return err
+	}
+	mainPath := filepath.Join(pg.workingDir, "backup", "main.tf")
+	if err := pg.writeFileWithConfirmation(mainPath, mainContent); err != nil {
+		if errors.Is(err, ErrFileSkipped) {
+			logger.Info("backup/main.tf skipped by user")
+		} else {
+			return err
+		}
+	}
+
+	if pg.shouldGenerateTerragrunt("backup", "", "bak") {
+		terragruntContent, err := pg.engine.Render("terragrunt.hcl.tpl", bakData)
+		if err != nil {
+			return err
+		}
+		terragruntPath := filepath.Join(pg.workingDir, "backup", "terragrunt.hcl")
+		if err := pg.writeFileWithConfirmation(terragruntPath, terragruntContent); err != nil {
+			if errors.Is(err, ErrFileSkipped) {
+				logger.Info("backup/terragrunt.hcl skipped by user")
+			} else {
+				return err
+			}
+		}
+	} else {
+		terragruntPath := filepath.Join(pg.workingDir, "backup", "terragrunt.hcl")
+		if utils.FileExists(terragruntPath) {
+			if err := utils.DeleteFile(terragruntPath); err != nil {
+				logger.Error("Failed to delete %s: %v", terragruntPath, err)
+			} else {
+				logger.Info("backup/terragrunt.hcl removed - terragrunt disabled")
+			}
+		} else {
+			logger.Info("backup/terragrunt.hcl skipped - terragrunt disabled")
+		}
+	}
+
+	if pg.shouldGenerateSecrets("backup", "", "bak") {
+		secretsContent, err := pg.engine.Render("_secrets.tf.tpl", bakData)
+		if err != nil {
+			return err
+		}
+		secretsPath := filepath.Join(pg.workingDir, "backup", "_secrets.tf")
+		if err := pg.writeFileWithConfirmation(secretsPath, secretsContent); err != nil {
+			if errors.Is(err, ErrFileSkipped) {
+				logger.Info("backup/_secrets.tf skipped by user")
+			} else {
+				return err
+			}
+		}
+	} else {
+		logger.Info("backup/_secrets.tf skipped - secrets disabled")
+	}
+
+	if pg.shouldGenerateProviders("backup", "", "bak") {
+		providersData := pg.buildProviderTemplateData("backup", "", "bak")
+		providersContent, err := pg.engine.Render("providers.tf.tpl", &models.TemplateData{
+			Providers: providersData.Providers,
+		})
+		if err != nil {
+			return err
+		}
+		providersPath := filepath.Join(pg.workingDir, "backup", "providers.tf")
+		if err := pg.writeFileWithConfirmation(providersPath, providersContent); err != nil {
+			if errors.Is(err, ErrFileSkipped) {
+				logger.Info("backup/providers.tf skipped by user")
+			} else {
+				return err
+			}
+		}
+	} else {
+		logger.Info("backup/providers.tf skipped - providers disabled")
+	}
+
+	if pg.shouldGenerateBackend("backup", "", "bak") {
+		backendData := pg.buildBackendTemplateData("backup", "", "bak")
+		backendContent, err := pg.engine.Render("backend.tf.tpl", &models.TemplateData{
+			BackendType:          backendData.Type,
+			BackendBucket:        backendData.Bucket,
+			BackendKey:           backendData.Key,
+			BackendRegion:        backendData.Region,
+			BackendDynamoDBTable: backendData.DynamoDBTable,
+			BackendEncrypt:       backendData.Encrypt,
+			BackendProfile:       backendData.Profile,
+			BackendAssumeRole:    backendData.AssumeRole,
+		})
+		if err != nil {
+			return err
+		}
+		backendPath := filepath.Join(pg.workingDir, "backup", "backend.tf")
+		if err := pg.writeFileWithConfirmation(backendPath, backendContent); err != nil {
+			if errors.Is(err, ErrFileSkipped) {
+				logger.Info("backup/backend.tf skipped by user")
+			} else {
+				return err
+			}
+		}
+	} else {
+		logger.Info("backup/backend.tf skipped - backend disabled")
+	}
+
+	return nil
+}
+
 // getDirectoryName determines the directory name for an environment using the fallback logic
 func (pg *ProjectGenerator) getDirectoryName(envKey string) string {
 	envConfig, exists := pg.config.Environments[envKey]
@@ -1226,6 +1367,9 @@ func (pg *ProjectGenerator) buildTemplateData(layer, env string) *models.Templat
 		case "security":
 			envName = "Security"
 			envKey = "sec"
+		case "backup":
+			envName = "Backup"
+			envKey = "bak"
 		default:
 			envName = ""
 			envKey = ""
@@ -1763,6 +1907,8 @@ func (pg *ProjectGenerator) buildProviderTemplateData(layerType, project, env st
 			profile = fmt.Sprintf("%s-org", pg.config.Client)
 		} else if layerType == "security" && env == "sec" && pg.config.Security != nil && pg.config.Security.AWSAccount != "" {
 			profile = fmt.Sprintf("%s-sec", pg.config.Client)
+		} else if layerType == "backup" && env == "bak" && pg.config.Backup != nil && pg.config.Backup.AWSAccount != "" {
+			profile = fmt.Sprintf("%s-bak", pg.config.Client)
 		} else if exists {
 			hasSSO := pg.config.AWSSSO != nil || (envConfig.AWSSSO != nil)
 			if hasSSO {
@@ -1797,6 +1943,10 @@ func (pg *ProjectGenerator) buildBackendTemplateData(layerType, project, env str
 	}
 	if layerType == "security" && env == "sec" && !exists && pg.config.Security != nil && pg.config.Security.AWSAccount != "" {
 		envConfig = models.Environment{Name: "Security", AWSAccount: pg.config.Security.AWSAccount}
+		exists = true
+	}
+	if layerType == "backup" && env == "bak" && !exists && pg.config.Backup != nil && pg.config.Backup.AWSAccount != "" {
+		envConfig = models.Environment{Name: "Backup", AWSAccount: pg.config.Backup.AWSAccount}
 		exists = true
 	}
 	if !exists || backendConfig == nil {
@@ -1887,6 +2037,8 @@ func (pg *ProjectGenerator) buildBackendTemplateData(layerType, project, env str
 			keyTemplate = fmt.Sprintf("%s/organization/terraform.tfstate", envConfig.AWSAccount)
 		case "security":
 			keyTemplate = fmt.Sprintf("%s/security/terraform.tfstate", envConfig.AWSAccount)
+		case "backup":
+			keyTemplate = fmt.Sprintf("%s/backup/terraform.tfstate", envConfig.AWSAccount)
 		default:
 			envSeg := models.EnvironmentNameForBackendKey(env, envConfig)
 			keyTemplate = fmt.Sprintf("%s/%s-%s/terraform.tfstate", envConfig.AWSAccount, layerType, envSeg)
@@ -2077,6 +2229,14 @@ func (pg *ProjectGenerator) GenerateSecurityFiles() error {
 	return pg.generateSecurityConfigs()
 }
 
+// GenerateBackupFiles generates backup layer files (public method for testing)
+func (pg *ProjectGenerator) GenerateBackupFiles() error {
+	if pg.config == nil {
+		return fmt.Errorf("config is required to generate backup files")
+	}
+	return pg.generateBackupConfigs()
+}
+
 // Generate runs the complete generation process (public method for testing)
 func (pg *ProjectGenerator) Generate() error {
 	if pg.config == nil {
@@ -2119,6 +2279,15 @@ func (pg *ProjectGenerator) shouldGenerateSecrets(layerType, project, env string
 	if layerType == "security" {
 		if pg.config.Security != nil && pg.config.Security.EnableSecrets != nil {
 			return *pg.config.Security.EnableSecrets
+		}
+		if pg.config.EnableSecrets != nil {
+			return *pg.config.EnableSecrets
+		}
+		return true
+	}
+	if layerType == "backup" {
+		if pg.config.Backup != nil && pg.config.Backup.EnableSecrets != nil {
+			return *pg.config.Backup.EnableSecrets
 		}
 		if pg.config.EnableSecrets != nil {
 			return *pg.config.EnableSecrets
@@ -2412,7 +2581,7 @@ func (pg *ProjectGenerator) shouldGenerateBackend(layerType, project, env string
 
 // shouldGenerateLayer determines if a specific layer should be generated for a specific environment
 // following the hierarchy: environment -> infrastructure -> default (true)
-// Note: organization and security layers are global and should not use this function with a real env key
+// Note: organization, security, and backup layers are global and should not use this function with a real env key
 func (pg *ProjectGenerator) shouldGenerateLayer(layerType, env string) bool {
 	// Organization is global; enabled only when layers.organization and infrastructure.organization.aws_account are set
 	if layerType == "organization" {
@@ -2420,6 +2589,9 @@ func (pg *ProjectGenerator) shouldGenerateLayer(layerType, env string) bool {
 	}
 	if layerType == "security" {
 		return pg.isSecurityLayerEnabled()
+	}
+	if layerType == "backup" {
+		return pg.isBackupLayerEnabled()
 	}
 
 	// Get environment configuration
@@ -2467,6 +2639,10 @@ func (pg *ProjectGenerator) getLayerDefault(layerType string) bool {
 			if pg.config.Layers.Security != nil {
 				return *pg.config.Layers.Security
 			}
+		case "backup":
+			if pg.config.Layers.Backup != nil {
+				return *pg.config.Layers.Backup
+			}
 		}
 	}
 	// Default to true if not specified
@@ -2490,6 +2666,13 @@ func (pg *ProjectGenerator) isSecurityLayerEnabled() bool {
 	return pg.getLayerDefault("security")
 }
 
+func (pg *ProjectGenerator) isBackupLayerEnabled() bool {
+	if pg.config.Backup == nil || pg.config.Backup.AWSAccount == "" {
+		return false
+	}
+	return pg.getLayerDefault("backup")
+}
+
 // IsOrganizationLayerEnabledForConfig reports whether the organization layer should be generated
 // for the given infrastructure config. Used by cmd (e.g. dry-run) and tests.
 func IsOrganizationLayerEnabledForConfig(config *models.InfrastructureConfig) bool {
@@ -2499,6 +2682,11 @@ func IsOrganizationLayerEnabledForConfig(config *models.InfrastructureConfig) bo
 // IsSecurityLayerEnabledForConfig reports whether the security layer should be generated for the given infrastructure config.
 func IsSecurityLayerEnabledForConfig(config *models.InfrastructureConfig) bool {
 	return models.IsSecurityEnabled(config)
+}
+
+// IsBackupLayerEnabledForConfig reports whether the backup layer should be generated for the given infrastructure config.
+func IsBackupLayerEnabledForConfig(config *models.InfrastructureConfig) bool {
+	return models.IsBackupEnabled(config)
 }
 
 // IsGitignoreGenerationEnabledForConfig reports whether gocloud generate should write root `.gitignore`.
@@ -2571,6 +2759,9 @@ func GetEnabledLayersFromConfig(config *models.Config) []string {
 	if pg.isSecurityLayerEnabled() {
 		layers = append(layers, "security")
 	}
+	if pg.isBackupLayerEnabled() {
+		layers = append(layers, "backup")
+	}
 
 	return layers
 }
@@ -2589,7 +2780,7 @@ func (pg *ProjectGenerator) generateEnvironmentTable() string {
 	if pg.config == nil {
 		return "No configuration."
 	}
-	if len(pg.config.Environments) == 0 && !pg.isOrganizationLayerEnabled() && !pg.isSecurityLayerEnabled() {
+	if len(pg.config.Environments) == 0 && !pg.isOrganizationLayerEnabled() && !pg.isSecurityLayerEnabled() && !pg.isBackupLayerEnabled() {
 		return "No environments configured."
 	}
 
@@ -2686,6 +2877,19 @@ func (pg *ProjectGenerator) generateEnvironmentTable() string {
 		table.WriteString(fmt.Sprintf("| Security | `%s` | - | - | %s | %s |\n",
 			region, terragruntStatus, secretsStatus))
 	}
+	if pg.isBackupLayerEnabled() {
+		region := pg.config.Region
+		terragruntStatus := "✅"
+		if pg.config.EnableTerragrunt != nil && !*pg.config.EnableTerragrunt {
+			terragruntStatus = "❌"
+		}
+		secretsStatus := "✅"
+		if pg.config.EnableSecrets != nil && !*pg.config.EnableSecrets {
+			secretsStatus = "❌"
+		}
+		table.WriteString(fmt.Sprintf("| Backup | `%s` | - | - | %s | %s |\n",
+			region, terragruntStatus, secretsStatus))
+	}
 
 	return table.String()
 }
@@ -2710,7 +2914,7 @@ func (pg *ProjectGenerator) generateCommandExamples() string {
 	// Generate environment-specific examples in the same order as defined
 	for _, envKey := range envKeys {
 		// Skip synthetic global layer keys (not real environment dirs)
-		if envKey == "org" || envKey == "sec" {
+		if envKey == "org" || envKey == "sec" || envKey == "bak" {
 			continue
 		}
 
@@ -2766,6 +2970,17 @@ func (pg *ProjectGenerator) generateCommandExamples() string {
 		examples.WriteString("terragrunt plan --working-dir=./security/\n\n")
 		examples.WriteString("# Apply security layer\n")
 		examples.WriteString("terragrunt apply --working-dir=./security/\n")
+		examples.WriteString("```\n\n")
+	}
+	if pg.isBackupLayerEnabled() {
+		examples.WriteString("### **Backup Layer**\n\n")
+		examples.WriteString("```bash\n")
+		examples.WriteString("# Initialize backup layer\n")
+		examples.WriteString("terragrunt init --working-dir=./backup/\n\n")
+		examples.WriteString("# Plan backup layer\n")
+		examples.WriteString("terragrunt plan --working-dir=./backup/\n\n")
+		examples.WriteString("# Apply backup layer\n")
+		examples.WriteString("terragrunt apply --working-dir=./backup/\n")
 		examples.WriteString("```\n\n")
 	}
 

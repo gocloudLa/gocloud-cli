@@ -475,14 +475,22 @@ func securitySSOEnabled(infra *models.InfrastructureConfig) bool {
 	return models.IsSecurityEnabled(infra)
 }
 
+func backupSSOEnabled(infra *models.InfrastructureConfig) bool {
+	return models.IsBackupEnabled(infra)
+}
+
 // environmentSSOProfileSkipped reports whether an environment's SSO profile is owned by a
 // global layer profile instead. environments.org and infrastructure.organization both map to
-// {client}-org; environments.sec and infrastructure.security both map to {client}-sec.
+// {client}-org; environments.sec and infrastructure.security both map to {client}-sec;
+// environments.bak and infrastructure.backup both map to {client}-bak.
 func environmentSSOProfileSkipped(envKey string, infra *models.InfrastructureConfig) bool {
 	if envKey == "org" && organizationSSOEnabled(infra) {
 		return true
 	}
 	if envKey == "sec" && securitySSOEnabled(infra) {
+		return true
+	}
+	if envKey == "bak" && backupSSOEnabled(infra) {
 		return true
 	}
 	return false
@@ -500,6 +508,9 @@ func countSSOProfiles(config *models.Config) int {
 		count++
 	}
 	if securitySSOEnabled(config.Infrastructure) {
+		count++
+	}
+	if backupSSOEnabled(config.Infrastructure) {
 		count++
 	}
 	return count
@@ -631,6 +642,41 @@ func generateAWSConfig(config *models.Config) (string, error) {
 			content.WriteString(fmt.Sprintf("[profile %s]\n", profileName))
 			content.WriteString(fmt.Sprintf("sso_session = %s\n", sessionName))
 			content.WriteString(fmt.Sprintf("sso_account_id = %s\n", sec.AWSAccount))
+			content.WriteString(fmt.Sprintf("sso_role_name = %s\n", ssoRoleName))
+			content.WriteString(fmt.Sprintf("region = %s\n", config.Infrastructure.Region))
+			content.WriteString("output = json\n")
+			content.WriteString("\n")
+			writtenProfiles[profileName] = true
+		}
+	}
+
+	// Backup layer: profile {client}-bak when backup.aws_account is set (same rules as security)
+	if backupSSOEnabled(config.Infrastructure) {
+		bak := config.Infrastructure.Backup
+		profileName := fmt.Sprintf("%s-bak", client)
+		ssoStartURL := globalSSO.StartURL
+		ssoRoleName := globalSSO.RoleName
+		if bak.AWSSSO != nil {
+			if bak.AWSSSO.StartURL != "" {
+				ssoStartURL = bak.AWSSSO.StartURL
+			}
+			if bak.AWSSSO.RoleName != "" {
+				ssoRoleName = bak.AWSSSO.RoleName
+			}
+		}
+		sessionName := fmt.Sprintf("%s-bak", client)
+		if !writtenSessions[sessionName] {
+			content.WriteString(fmt.Sprintf("[sso-session %s]\n", sessionName))
+			content.WriteString(fmt.Sprintf("sso_start_url = %s\n", ssoStartURL))
+			content.WriteString(fmt.Sprintf("sso_region = %s\n", globalSSO.Region))
+			content.WriteString("sso_registration_scopes = sso:account:access\n")
+			content.WriteString("\n")
+			writtenSessions[sessionName] = true
+		}
+		if !writtenProfiles[profileName] {
+			content.WriteString(fmt.Sprintf("[profile %s]\n", profileName))
+			content.WriteString(fmt.Sprintf("sso_session = %s\n", sessionName))
+			content.WriteString(fmt.Sprintf("sso_account_id = %s\n", bak.AWSAccount))
 			content.WriteString(fmt.Sprintf("sso_role_name = %s\n", ssoRoleName))
 			content.WriteString(fmt.Sprintf("region = %s\n", config.Infrastructure.Region))
 			content.WriteString("output = json\n")

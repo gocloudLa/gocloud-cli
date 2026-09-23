@@ -90,6 +90,11 @@ func ValidateConfig(config *Config) error {
 				validationErrors = append(validationErrors, fmt.Sprintf("infrastructure.security.secrets: %v", err))
 			}
 		}
+		if config.Infrastructure.Backup != nil && config.Infrastructure.Backup.Secrets != nil {
+			if err := ValidateSecretsConfig(config.Infrastructure.Backup.Secrets); err != nil {
+				validationErrors = append(validationErrors, fmt.Sprintf("infrastructure.backup.secrets: %v", err))
+			}
+		}
 		// Validate organization: when layers.organization is true, infrastructure.organization with aws_account is required
 		if config.Infrastructure.Layers != nil && config.Infrastructure.Layers.Organization != nil && *config.Infrastructure.Layers.Organization {
 			if config.Infrastructure.Organization == nil || config.Infrastructure.Organization.AWSAccount == "" {
@@ -102,6 +107,11 @@ func ValidateConfig(config *Config) error {
 				validationErrors = append(validationErrors, "security layer is enabled (layers.security: true) but infrastructure.security.aws_account is required for backend, secrets, and SSO")
 			}
 		}
+		if config.Infrastructure.Layers != nil && config.Infrastructure.Layers.Backup != nil && *config.Infrastructure.Layers.Backup {
+			if config.Infrastructure.Backup == nil || config.Infrastructure.Backup.AWSAccount == "" {
+				validationErrors = append(validationErrors, "backup layer is enabled (layers.backup: true) but infrastructure.backup.aws_account is required for backend, secrets, and SSO")
+			}
+		}
 		// Validate organization aws_account if present (used for SSO profile client-org)
 		if config.Infrastructure.Organization != nil && config.Infrastructure.Organization.AWSAccount != "" {
 			if err := validation.ValidateAWSAccountID(config.Infrastructure.Organization.AWSAccount); err != nil {
@@ -111,6 +121,11 @@ func ValidateConfig(config *Config) error {
 		if config.Infrastructure.Security != nil && config.Infrastructure.Security.AWSAccount != "" {
 			if err := validation.ValidateAWSAccountID(config.Infrastructure.Security.AWSAccount); err != nil {
 				validationErrors = append(validationErrors, fmt.Sprintf("infrastructure.security.aws_account: %v", err))
+			}
+		}
+		if config.Infrastructure.Backup != nil && config.Infrastructure.Backup.AWSAccount != "" {
+			if err := validation.ValidateAWSAccountID(config.Infrastructure.Backup.AWSAccount); err != nil {
+				validationErrors = append(validationErrors, fmt.Sprintf("infrastructure.backup.aws_account: %v", err))
 			}
 		}
 
@@ -237,6 +252,7 @@ func ValidateConfigWithUnknownFields(yamlData []byte) (*ValidationResult, error)
 				"secrets":           true,
 				"organization":      true,
 				"security":          true,
+				"backup":            true,
 			}
 
 			for field := range infraMap {

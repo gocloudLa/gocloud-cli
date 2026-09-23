@@ -197,6 +197,7 @@ func showDirectoryStructure(config *models.InfrastructureConfig) {
 	utils.PrintText("   ├── workload/\n")
 	utils.PrintText("   ├── organization/\n")
 	utils.PrintText("   ├── security/\n")
+	utils.PrintText("   ├── backup/\n")
 	if generator.IsGitignoreGenerationEnabledForConfig(config) {
 		utils.PrintText("   ├── .gitignore\n")
 	}
@@ -378,6 +379,23 @@ func shouldGenerateSecurityTerragruntForPreview(config *models.InfrastructureCon
 	return true
 }
 
+func shouldGenerateBackupSecretsForPreview(config *models.InfrastructureConfig) bool {
+	if config.Backup != nil && config.Backup.EnableSecrets != nil {
+		return *config.Backup.EnableSecrets
+	}
+	if config.EnableSecrets != nil {
+		return *config.EnableSecrets
+	}
+	return true
+}
+
+func shouldGenerateBackupTerragruntForPreview(config *models.InfrastructureConfig) bool {
+	if config.EnableTerragrunt != nil {
+		return *config.EnableTerragrunt
+	}
+	return true
+}
+
 func showFilesToGenerate(config *models.InfrastructureConfig) {
 	baseDir := generateWorkingDir
 	if baseDir == "." {
@@ -472,6 +490,19 @@ func showFilesToGenerate(config *models.InfrastructureConfig) {
 		utils.PrintText("   %s/security/providers.tf\n", baseDir)
 		utils.PrintText("   %s/security/backend.tf\n", baseDir)
 	}
+
+	if generator.IsBackupLayerEnabledForConfig(config) {
+		utils.PrintText("   %s/backup/main.tf\n", baseDir)
+		utils.PrintText("   %s/backup/metadata.tf\n", baseDir)
+		if shouldGenerateBackupSecretsForPreview(config) {
+			utils.PrintText("   %s/backup/_secrets.tf\n", baseDir)
+		}
+		if shouldGenerateBackupTerragruntForPreview(config) {
+			utils.PrintText("   %s/backup/terragrunt.hcl\n", baseDir)
+		}
+		utils.PrintText("   %s/backup/providers.tf\n", baseDir)
+		utils.PrintText("   %s/backup/backend.tf\n", baseDir)
+	}
 }
 
 func showGenerationSummary(config *models.Config, workingDir string) {
@@ -519,6 +550,9 @@ func showGenerationSummary(config *models.Config, workingDir string) {
 	if shouldGenerateLayerForSummary(config, "security", "") {
 		utils.PrintText("   security/\n")
 	}
+	if shouldGenerateLayerForSummary(config, "backup", "") {
+		utils.PrintText("   backup/\n")
+	}
 
 	utils.PrintInfo("\n📋 Next Steps:")
 	utils.PrintText("  1. Review the generated configuration files\n")
@@ -547,6 +581,9 @@ func shouldGenerateLayerForSummary(config *models.Config, layerType, envKey stri
 	}
 	if layerType == "security" {
 		return config.Infrastructure != nil && generator.IsSecurityLayerEnabledForConfig(config.Infrastructure)
+	}
+	if layerType == "backup" {
+		return config.Infrastructure != nil && generator.IsBackupLayerEnabledForConfig(config.Infrastructure)
 	}
 
 	// Get environment configuration
@@ -593,6 +630,10 @@ func getLayerDefaultForSummary(config *models.Config, layerType string) bool {
 		case "security":
 			if config.Infrastructure.Layers.Security != nil {
 				return *config.Infrastructure.Layers.Security
+			}
+		case "backup":
+			if config.Infrastructure.Layers.Backup != nil {
+				return *config.Infrastructure.Layers.Backup
 			}
 		}
 	}

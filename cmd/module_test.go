@@ -251,7 +251,7 @@ func (e *ValidationError) Error() string {
 }
 
 func isValidModuleName(name string) bool {
-	validModules := []string{"base", "foundation", "project", "workload", "organization", "security"}
+	validModules := []string{"base", "foundation", "project", "workload", "organization", "security", "backup"}
 	for _, valid := range validModules {
 		if name == valid {
 			return true

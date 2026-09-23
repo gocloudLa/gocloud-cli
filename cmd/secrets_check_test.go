@@ -146,6 +146,16 @@ func TestParseLayerPathComponents_Security(t *testing.T) {
 	}
 }
 
+func TestParseLayerPathComponents_Backup(t *testing.T) {
+	layerType, project, env, ok := parseLayerPathComponents("backup")
+	if !ok {
+		t.Fatal(`parseLayerPathComponents("backup") should be valid`)
+	}
+	if layerType != "backup" || project != "" || env != "bak" {
+		t.Errorf("parseLayerPathComponents(\"backup\") = %q, %q, %q; want backup, \"\", bak", layerType, project, env)
+	}
+}
+
 func TestShouldGenerateSecretsForPath_Security(t *testing.T) {
 	infra := &models.InfrastructureConfig{
 		Security:      &models.OrganizationLayerConfig{AWSAccount: "123456789012"},
