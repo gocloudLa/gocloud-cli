@@ -51,6 +51,7 @@ func (te *TemplateEngine) loadTemplates() {
 	te.templates["main.tf.workload.tpl"] = template.Must(template.New("main.tf.workload").Parse(mainWorkloadTemplate))
 	te.templates["main.tf.organization.tpl"] = template.Must(template.New("main.tf.organization").Parse(mainOrganizationTemplate))
 	te.templates["main.tf.security.tpl"] = template.Must(template.New("main.tf.security").Parse(mainSecurityTemplate))
+	te.templates["main.tf.backup.tpl"] = template.Must(template.New("main.tf.backup").Parse(mainBackupTemplate))
 
 	// Provider and backend templates
 	te.templates["providers.tf.tpl"] = template.Must(template.New("providers.tf").Parse(providersTemplate))
@@ -283,6 +284,29 @@ module "security" {
     aws.org = aws.org
     aws.sec = aws.sec
     aws.log = aws.log
+    aws.kms = aws.kms
+  }
+
+}
+`
+
+const mainBackupTemplate = `# =============================================================================
+# This file is generated and maintained by GoCloud CLI
+# You CAN edit this file manually to add your custom configuration
+# GoCloud CLI will only update the module version when needed
+# =============================================================================
+
+module "backup" {
+{{- if .IsGitSource }}
+  source = "{{.Source}}//modules/backup?ref={{.SourceRef}}"
+{{else}}
+  source  = "gocloudLa/standard-platform/aws//modules/backup"
+  version = "{{.Version}}"
+{{end}}
+  providers = {
+    aws.org = aws.org
+    aws.bkp = aws.bkp
+    aws.bkv = aws.bkv
     aws.kms = aws.kms
   }
 

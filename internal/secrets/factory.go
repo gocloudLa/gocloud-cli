@@ -37,12 +37,14 @@ func ResolveSecretsConfig(config *models.Config, layerPath string) (*models.Secr
 	var projectKey, envKey string
 
 	if len(parts) == 1 {
-		// Format: organization or security (global layer, no environment)
+		// Format: organization, security, or backup (global layer, no environment)
 		switch layerType {
 		case "organization":
 			envKey = "org"
 		case "security":
 			envKey = "sec"
+		case "backup":
+			envKey = "bak"
 		default:
 			return nil, fmt.Errorf("invalid layer path format: %s", layerPath)
 		}

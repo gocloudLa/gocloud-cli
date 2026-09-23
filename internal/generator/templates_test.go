@@ -30,6 +30,7 @@ func TestNewTemplateEngine(t *testing.T) {
 		"main.tf.workload.tpl",
 		"main.tf.organization.tpl",
 		"main.tf.security.tpl",
+		"main.tf.backup.tpl",
 	}
 
 	for _, templateName := range expectedTemplates {
@@ -519,6 +520,11 @@ func TestTemplateEngineRenderMainTemplates(t *testing.T) {
 			templateName:   "main.tf.security.tpl",
 			expectedModule: "security",
 		},
+		{
+			name:           "backup template",
+			templateName:   "main.tf.backup.tpl",
+			expectedModule: "backup",
+		},
 	}
 
 	for _, tt := range tests {
@@ -541,6 +547,15 @@ func TestTemplateEngineRenderMainTemplates(t *testing.T) {
 				expectedContent = append(expectedContent,
 					"providers = {",
 					"aws.log = aws.log",
+					"aws.kms = aws.kms",
+				)
+			}
+			if tt.expectedModule == "backup" {
+				expectedContent = append(expectedContent,
+					"providers = {",
+					"aws.org = aws.org",
+					"aws.bkp = aws.bkp",
+					"aws.bkv = aws.bkv",
 					"aws.kms = aws.kms",
 				)
 			}

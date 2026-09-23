@@ -10,7 +10,7 @@ Stable links:
 From the CLI README (paraphrased):
 
 - Validates YAML; errors abort, unknown fields warn.
-- Writes directory tree per organization, security (if configured), base, foundation, project, workload.
+- Writes directory tree per organization, security, backup (if configured), base, foundation, project, workload.
 - Writes `main.tf`, `metadata.tf`, `terragrunt.hcl`, `backend.tf`, `providers.tf`, `_secrets.tf` (when secrets enabled), conditional extras, `.gitignore` (unless `enable_gitignore: false`), project `README.md`.
 - `main.tf` is never overwritten as a whole: only `version = "…"` updates when configured platform version changes. Other `main.tf` edits remain manual.
 
@@ -32,7 +32,7 @@ So Standard Platform inputs (`*_parameters`) live here by team choice; the CLI p
 
 The [full example](https://raw.githubusercontent.com/gocloudLa/gocloud-cli/main/example/gocloud.yaml) shows:
 
-- `infrastructure.layers`: toggles generation of organization, security, base, foundation globally.
+- `infrastructure.layers`: toggles generation of organization, security, backup, base, foundation globally.
 - Per-environment `layers` can disable base/foundation for an account.
 - Projects/workloads: simple list entries (e.g. `- myproject`) or richer maps (`name`, `dir_name`, `backend`, `providers`, `enable_terragrunt`, …).
 - Organization activates when `organization.aws_account` is set (`layers.organization` not `false`).

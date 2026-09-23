@@ -545,6 +545,46 @@ func TestIsSecurityLayerEnabledForConfig(t *testing.T) {
 	}
 }
 
+func TestIsBackupLayerEnabledForConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   *models.InfrastructureConfig
+		expected bool
+	}{
+		{
+			name: "backup enabled with aws_account",
+			config: &models.InfrastructureConfig{
+				Backup: &models.OrganizationLayerConfig{AWSAccount: "123456789012"},
+				Layers: &models.LayerConfig{Backup: &[]bool{true}[0]},
+			},
+			expected: true,
+		},
+		{
+			name: "backup disabled explicitly",
+			config: &models.InfrastructureConfig{
+				Backup: &models.OrganizationLayerConfig{AWSAccount: "123456789012"},
+				Layers: &models.LayerConfig{Backup: &[]bool{false}[0]},
+			},
+			expected: false,
+		},
+		{
+			name: "layers.backup true but no aws_account",
+			config: &models.InfrastructureConfig{
+				Layers: &models.LayerConfig{Backup: &[]bool{true}[0]},
+			},
+			expected: false,
+		},
+		{name: "empty", config: &models.InfrastructureConfig{}, expected: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := generator.IsBackupLayerEnabledForConfig(tt.config); got != tt.expected {
+				t.Errorf("IsBackupLayerEnabledForConfig() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestIsOrganizationLayerEnabledForConfig(t *testing.T) {
 	tests := []struct {
 		name     string

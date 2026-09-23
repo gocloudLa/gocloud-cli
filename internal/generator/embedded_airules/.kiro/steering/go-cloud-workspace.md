@@ -48,7 +48,7 @@ Deep behavior, overrides, `--force` risks, SSO/secrets/generate commands: `@` sk
 
 Stacks live under:
 
-- `organization/` (and `security/` if configured) — no `environment_dir` branch (unlike base/foundation/project/workload).
+- `organization/` (and `security/` or `backup/` if configured) — no `environment_dir` branch (unlike base/foundation/project/workload).
 - `base/<environment_dir>/`, `foundation/<environment_dir>/` — aligned with `gocloud.yaml` environments.
 - `project/<project_name>/<environment_dir>/`, `workload/<project_name>/<environment_dir>/` — `project_name` comes from `projects` / `workloads`; `environment_dir` is CLI-derived (YAML env key `dir_name` can override).
 

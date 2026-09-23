@@ -6,7 +6,7 @@ cli:
   debug: false
 
 infrastructure:
-  client: test-client
+  client: testclient
   company: gcl
   region: us-east-1
   version: 0.28.0
@@ -53,20 +53,20 @@ infrastructure:
         - name: "aws"
           alias: "org"
           region: "local.metadata.aws_region"
+          profile: "testclient-org"
         - name: "aws"
           alias: "sec"
           region: "local.metadata.aws_region"
-          # Optional cross account with profile
-          # profile: "demosecurity-sec" 
+          profile: "testclient-sec"
         - name: "aws"
           alias: "log"
           region: "local.metadata.aws_region"
-          # Opcional: cross account with assume_role
-          # assume_role:
-          #   role_arn: "arn:aws:iam::111111111111:role/OrganizationAccountAccessRole"
+          profile: "testclient-log"
         - name: "aws"
           alias: "kms"
           region: "local.metadata.aws_region"
+          profile: "testclient-sec"
+
     # secrets:
     #   type: "sops"
     # backend:     # Optional: override backend only for organization/backend.tf (pattern, region, encrypt, profiles/assume_role/lock table, etc.)
@@ -78,11 +78,37 @@ infrastructure:
     # aws_sso:                      # Optional: override SSO for org profile
     #   start_url: "https://..."
     #   role_name: "Admin"
+  backup:
+    aws_account: "112345678902"   # Required for SSO: creates profile {client}-bak so sso login --all includes it
+    # metadata:
+    #   private_domain: "bak.democorp.private"  # Optional override only for backup metadata.tf
+    # enable_secrets: true        # (optional) secrets only for backup layer (overrides global enable_secrets)
+    providers:
+      default_providers:
+        - name: "aws"
+          region: "local.metadata.aws_region"
+        - name: "aws"
+          alias: "org"
+          region: "local.metadata.aws_region"
+          profile: "testclient-org"
+        - name: "aws"
+          alias: "bkp"
+          region: "local.metadata.aws_region"
+          profile: "testclient-bkp"
+        - name: "aws"
+          alias: "bkv"
+          region: "local.metadata.aws_region"
+          profile: "testclient-bkv"
+        - name: "aws"
+          alias: "kms"
+          region: "local.metadata.aws_region"
+          profile: "testclient-sec"
   layers:  # Global layer settings (default: all true)
     base: true
     foundation: true
     organization: true
     security: true
+    backup: true
 
   # Default backend settings (commented - uncomment to customize):
   # backend:

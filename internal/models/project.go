@@ -16,6 +16,7 @@ type LayerConfig struct {
 	Foundation   *bool `json:"foundation" yaml:"foundation,omitempty"`
 	Organization *bool `json:"organization" yaml:"organization,omitempty"` // Global only
 	Security     *bool `json:"security" yaml:"security,omitempty"`         // Global only
+	Backup       *bool `json:"backup" yaml:"backup,omitempty"`             // Global only
 }
 
 // OrganizationLayerConfig holds layer-specific overrides for the organization layer only.
@@ -69,6 +70,8 @@ type InfrastructureConfig struct {
 	Organization *OrganizationLayerConfig `json:"organization" yaml:"organization,omitempty"`
 	// Security layer overrides (same shape as organization); only applies to the security layer
 	Security *OrganizationLayerConfig `json:"security" yaml:"security,omitempty"`
+	// Backup layer overrides (same shape as organization); only applies to the backup layer
+	Backup *OrganizationLayerConfig `json:"backup" yaml:"backup,omitempty"`
 }
 
 // ProjectItem represents a project item that can be either a string or an object
@@ -599,6 +602,8 @@ func CalculateDependencies(layer, project, envKey string, config *Infrastructure
 		return []string{} // organization is global, no dependencies (like base)
 	case "security":
 		return []string{} // security is global, no dependencies (like base)
+	case "backup":
+		return []string{} // backup is global, no dependencies (like base)
 	case "foundation":
 		if !isEnvLayerEnabled(config, "base", envKey) {
 			return []string{}
@@ -1134,12 +1139,12 @@ func (env Environment) GetVersion(infra *InfrastructureConfig) string {
 
 // RegionForEnvironment returns the effective AWS region for an environment key (metadata, SSM, SOPS, etc.).
 // Priority: Environments[envKey].region if set, else infrastructure.region.
-// Empty envKey, "org", or "sec" uses only infrastructure.region.
+// Empty envKey, "org", "sec", or "bak" uses only infrastructure.region.
 func (c *InfrastructureConfig) RegionForEnvironment(envKey string) string {
 	if c == nil {
 		return ""
 	}
-	if envKey == "" || envKey == "org" || envKey == "sec" {
+	if envKey == "" || envKey == "org" || envKey == "sec" || envKey == "bak" {
 		return c.Region
 	}
 	if envCfg, ok := c.Environments[envKey]; ok && envCfg.Region != "" {
@@ -1191,6 +1196,18 @@ func IsSecurityEnabled(config *InfrastructureConfig) bool {
 	return true
 }
 
+// IsBackupEnabled reports whether the backup global layer/profile is enabled.
+// Rule: backup.aws_account must be set, unless layers.backup is explicitly false.
+func IsBackupEnabled(config *InfrastructureConfig) bool {
+	if config == nil || config.Backup == nil || config.Backup.AWSAccount == "" {
+		return false
+	}
+	if config.Layers != nil && config.Layers.Backup != nil && !*config.Layers.Backup {
+		return false
+	}
+	return true
+}
+
 // ResolveProviderConfig resolves provider configuration with hierarchy
 // Priority: Organization override > Workload > Project > Environment > Global
 func (config *InfrastructureConfig) ResolveProviderConfig(layerType, projectKey, envKey string) *ProviderConfig {
@@ -1201,8 +1218,8 @@ func (config *InfrastructureConfig) ResolveProviderConfig(layerType, projectKey,
 		*result = *config.Providers
 	}
 
-	// Apply environment overrides (not used for organization/security; those layers have no env in config)
-	if layerType != "organization" && layerType != "security" {
+	// Apply environment overrides (not used for organization/security/backup; those layers have no env in config)
+	if layerType != "organization" && layerType != "security" && layerType != "backup" {
 		if envConfig, exists := config.Environments[envKey]; exists && envConfig.Providers != nil {
 			result = mergeProviderConfigs(result, envConfig.Providers)
 		}
@@ -1232,6 +1249,9 @@ func (config *InfrastructureConfig) ResolveProviderConfig(layerType, projectKey,
 	if layerType == "security" && config.Security != nil && config.Security.Providers != nil {
 		result = mergeProviderConfigs(result, config.Security.Providers)
 	}
+	if layerType == "backup" && config.Backup != nil && config.Backup.Providers != nil {
+		result = mergeProviderConfigs(result, config.Backup.Providers)
+	}
 
 	return result
 }
@@ -1245,8 +1265,8 @@ func (config *InfrastructureConfig) ResolveBackendConfig(layerType, projectKey, 
 		*result = *config.Backend
 	}
 
-	// Apply environment overrides (not used for organization/security; those layers have no env in config)
-	if layerType != "organization" && layerType != "security" {
+	// Apply environment overrides (not used for organization/security/backup; those layers have no env in config)
+	if layerType != "organization" && layerType != "security" && layerType != "backup" {
 		if envConfig, exists := config.Environments[envKey]; exists && envConfig.Backend != nil {
 			result = mergeBackendInfrastructureConfigs(result, envConfig.Backend)
 		}
@@ -1275,6 +1295,9 @@ func (config *InfrastructureConfig) ResolveBackendConfig(layerType, projectKey, 
 	}
 	if layerType == "security" && config.Security != nil && config.Security.Backend != nil {
 		result = mergeBackendInfrastructureConfigs(result, config.Security.Backend)
+	}
+	if layerType == "backup" && config.Backup != nil && config.Backup.Backend != nil {
+		result = mergeBackendInfrastructureConfigs(result, config.Backup.Backend)
 	}
 
 	if result.Pattern == "" {
@@ -1625,7 +1648,7 @@ func mergeMetadataMaps(base, override map[string]interface{}) map[string]interfa
 }
 
 // ResolveMetadata resolves custom metadata with hierarchy.
-// Priority: organization/security override > environment override > global infrastructure metadata.
+// Priority: organization/security/backup override > environment override > global infrastructure metadata.
 func (config *InfrastructureConfig) ResolveMetadata(layerType, envKey string) map[string]interface{} {
 	if config == nil {
 		return nil
@@ -1643,6 +1666,13 @@ func (config *InfrastructureConfig) ResolveMetadata(layerType, envKey string) ma
 	if layerType == "security" {
 		if config.Security != nil {
 			result = mergeMetadataMaps(result, config.Security.Metadata)
+		}
+		return result
+	}
+
+	if layerType == "backup" {
+		if config.Backup != nil {
+			result = mergeMetadataMaps(result, config.Backup.Metadata)
 		}
 		return result
 	}
@@ -1694,6 +1724,9 @@ func (config *InfrastructureConfig) ResolveSecretsConfig(layerType, projectKey, 
 	}
 	if layerType == "security" && config.Security != nil && config.Security.Secrets != nil {
 		result = mergeSecretsConfigs(result, config.Security.Secrets)
+	}
+	if layerType == "backup" && config.Backup != nil && config.Backup.Secrets != nil {
+		result = mergeSecretsConfigs(result, config.Backup.Secrets)
 	}
 
 	return result

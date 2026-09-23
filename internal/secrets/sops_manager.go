@@ -136,7 +136,7 @@ func (m *SOPSManager) getRegionForEnvironment(envKey string) string {
 }
 
 // getAccountForEnvironment returns AWS account ID and display name for an env key.
-// For "org" / "sec" uses infrastructure.organization / infrastructure.security aws_account; otherwise Environments[envKey].
+// For "org" / "sec" / "bak" uses infrastructure.organization / infrastructure.security / infrastructure.backup aws_account; otherwise Environments[envKey].
 func (m *SOPSManager) getAccountForEnvironment(envKey string) (accountID, displayName string, err error) {
 	if envKey == "org" {
 		if m.config.Infrastructure.Organization == nil || m.config.Infrastructure.Organization.AWSAccount == "" {
@@ -149,6 +149,12 @@ func (m *SOPSManager) getAccountForEnvironment(envKey string) (accountID, displa
 			return "", "", fmt.Errorf("security layer not configured (missing infrastructure.security.aws_account)")
 		}
 		return m.config.Infrastructure.Security.AWSAccount, "Security", nil
+	}
+	if envKey == "bak" {
+		if m.config.Infrastructure.Backup == nil || m.config.Infrastructure.Backup.AWSAccount == "" {
+			return "", "", fmt.Errorf("backup layer not configured (missing infrastructure.backup.aws_account)")
+		}
+		return m.config.Infrastructure.Backup.AWSAccount, "Backup", nil
 	}
 	envConfig, exists := m.config.Infrastructure.Environments[envKey]
 	if !exists {
@@ -403,6 +409,9 @@ func (m *SOPSManager) getSecretsFilePath(layer *Layer) (string, error) {
 	}
 	if layer.LayerType == "security" {
 		return filepath.Join(m.workingDir, "security", "_secrets.yaml"), nil
+	}
+	if layer.LayerType == "backup" {
+		return filepath.Join(m.workingDir, "backup", "_secrets.yaml"), nil
 	}
 
 	// Get environment directory name
