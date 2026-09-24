@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.13.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.12.0...v1.13.0) (2026-09-23)
+
+
+### Features
+
+* **backend:** update default backend values ([#41](https://github.com/gocloudLa/gocloud-cli/issues/41)) ([48116ab](https://github.com/gocloudLa/gocloud-cli/commit/48116ab26ca64615c56fab92ae6065a167a79a62))
+* **backup:** add backup layer support ([#44](https://github.com/gocloudLa/gocloud-cli/issues/44)) ([ba3ddef](https://github.com/gocloudLa/gocloud-cli/commit/ba3ddefbfc5773bf4dec797af210998c7a8ca3e0))
+* **dependencies:** enhance dependency resolution. ([#43](https://github.com/gocloudLa/gocloud-cli/issues/43)) ([6456a7d](https://github.com/gocloudLa/gocloud-cli/commit/6456a7d7173d092ca875464e356c933169ed068c))
+
 ## [1.12.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.11.0...v1.12.0) (2026-09-23)
 
 
