@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.14.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.13.0...v1.14.0) (2026-10-03)
+
+
+### Features
+
+* **config:** introduce YAML path overrides for gocloud generate command ([#45](https://github.com/gocloudLa/gocloud-cli/issues/45)) ([26d7b36](https://github.com/gocloudLa/gocloud-cli/commit/26d7b36cbf4a8f774277837d1b7286204a71a4b8))
+* **versioning:** enhance versioning logic for projects and workloads ([c0f6f03](https://github.com/gocloudLa/gocloud-cli/commit/c0f6f030d826e2cc8699e3b82c81c2908e596dd7))
+
 ## [1.13.0](https://github.com/gocloudLa/gocloud-cli/compare/v1.12.0...v1.13.0) (2026-09-23)
 
 
