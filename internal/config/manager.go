@@ -56,11 +56,41 @@ func (m *Manager) LoadConfig(filepath string) (*models.Config, error) {
 
 // LoadConfigWithValidation loads a configuration from a file and validates it
 func (m *Manager) LoadConfigWithValidation(filepath string) (*models.Config, *models.ValidationResult, error) {
+	return m.LoadConfigWithValidationAndOverrides(filepath, nil)
+}
+
+// LoadConfigWithValidationAndOverrides loads a configuration file, applies
+// optional YAML path overrides, validates the result, and parses it.
+// Overrides use the form "dotted.path: <yaml-value>"; null removes a key.
+// When overrides are present, environment key order from the merged document is kept.
+func (m *Manager) LoadConfigWithValidationAndOverrides(filepath string, overrides []string) (*models.Config, *models.ValidationResult, error) {
 	data, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
+	if len(overrides) > 0 {
+		data, err = ApplyYAMLOverrides(data, overrides)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	config, validationResult, err := m.loadConfigWithValidationFromData(data)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(overrides) > 0 {
+		if err := m.preserveEnvironmentOrder(data, config); err != nil {
+			fmt.Printf("Warning: Could not preserve environment order: %v\n", err)
+		}
+	}
+
+	return config, validationResult, nil
+}
+
+func (m *Manager) loadConfigWithValidationFromData(data []byte) (*models.Config, *models.ValidationResult, error) {
 	// Validate with unknown field detection
 	validationResult, err := models.ValidateConfigWithUnknownFields(data)
 	if err != nil {
