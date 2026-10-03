@@ -109,12 +109,18 @@ gocloud config validate --strict              # Treat warnings as errors
 
 Reads `gocloud.yaml` and generates the directory tree (organization, security, backup, base, foundation, project, workload), config files (`main.tf`, `metadata.tf`, `terragrunt.hcl`, `backend.tf`, `providers.tf`, `_secrets.tf` where enabled), then the root `.gitignore` and optional `.cursor` / `.kiro` airules bundles (each logs start/finish lines via `INFO:` like SSO and README), followed by AWS SSO setup, secrets scaffolding, and a project `README.md`. Validation runs first; errors abort generation, warnings are reported and ignored. New directories/files are created without prompting; existing `main.tf` files are never overwritten (only the module version line is updated when the configured version changes); other generated files prompt for overwrite unless `--force` is passed.
 
+Repeatable `--override` assigns one YAML path on the loaded file before validation. The value replaces that path; `null` or `~` removes the key. Quote each assignment so the shell keeps it as a single argument. A global override does not replace a more specific value already set on an environment, project, workload, or special layer. See **SSO control** for omitting SSO profiles on a role-authenticated runner.
+
 ```bash
 gocloud generate                          # Defaults to ./gocloud.yaml
 gocloud generate --dry-run                # Preview without writing files
 gocloud generate --force                  # Overwrite existing files (except main.tf)
 gocloud generate --working-dir custom-dir # Output to custom directory
 gocloud generate --config custom.yaml     # Use specific config file
+# Omit SSO profiles without editing gocloud.yaml (ambient credentials / instance role)
+gocloud generate --force \
+  --override 'infrastructure.providers.use_profiles: false' \
+  --override 'infrastructure.backend.use_profile: false'
 ```
 
 ### SSO
@@ -996,8 +1002,8 @@ infrastructure:
 
 **Default behavior:**
 - Per-environment SSO is on by default; disable with `enable_sso: false` on that environment.
-- Environments inherit `aws_sso.start_url`, `aws_sso.role_name`, and `aws_sso.region` from global config.
-- The organization, security, and backup layers, when activated, get their own profiles and may set `aws_sso` overrides inside `infrastructure.organization` / `infrastructure.security` / `infrastructure.backup`.
+- Environments inherit `aws_sso.start_url`, `aws_sso.role_name`, and `aws_sso.region` from global config. Organization, security, and backup layers get their own profiles when activated, and may set `aws_sso` inside those blocks.
+- `profile` lines in generated `providers.tf` and `backend.tf` follow `providers.use_profiles` and `backend.use_profile`. To omit them on a role-authenticated runner without editing the file, use `gocloud generate --override` (see **Generate**). `infrastructure.aws_sso: null` only clears the global SSO defaults; a global override does not replace a more specific `use_profiles`, `use_profile`, or `aws_sso`.
 
 **Override scope:**
 

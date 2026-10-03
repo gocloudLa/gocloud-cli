@@ -22,6 +22,7 @@ var (
 	generateWorkingDir string
 	generateDryRun     bool
 	generateForce      bool
+	generateOverrides  []string
 )
 
 var generateCmd = &cobra.Command{
@@ -37,6 +38,7 @@ func init() {
 	generateCmd.Flags().StringVar(&generateWorkingDir, "working-dir", ".", "Working directory for infrastructure generation")
 	generateCmd.Flags().BoolVar(&generateDryRun, "dry-run", false, "Show what would be generated without creating files")
 	generateCmd.Flags().BoolVar(&generateForce, "force", false, "Overwrite existing files without confirmation")
+	generateCmd.Flags().StringArrayVar(&generateOverrides, "override", nil, "YAML path assignment merged into the loaded config before generation (repeatable). Example: --override 'infrastructure.providers.use_profiles: false'. null removes a key.")
 
 	// Command is registered in cmd/root.go
 }
@@ -52,8 +54,17 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 	// Load and validate configuration
 	utils.PrintWarning("📋 Loading and validating configuration...")
+	if len(generateOverrides) > 0 {
+		utils.PrintWarning("🧩 Applying configuration overrides:")
+		for _, override := range generateOverrides {
+			utils.PrintText("   - %s\n", override)
+		}
+	}
 	configManager := config.NewManager()
-	config, validationResult, err := configManager.LoadConfigWithValidation(generateConfigFile)
+	config, validationResult, err := configManager.LoadConfigWithValidationAndOverrides(generateConfigFile, generateOverrides)
+	if err != nil && isOverrideError(err) {
+		return err
+	}
 	if err != nil {
 		// Check if it's a file not found error
 		if os.IsNotExist(err) {
@@ -143,6 +154,10 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	showGenerationSummary(config, workingDir)
 
 	return nil
+}
+
+func isOverrideError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "--override")
 }
 
 func runDryRun(_ *generator.ProjectGenerator, config *models.Config) error {
