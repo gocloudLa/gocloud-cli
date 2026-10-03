@@ -598,6 +598,44 @@ func TestBuildTemplateData(t *testing.T) {
 	}
 }
 
+func TestBuildProjectTemplateData_StackVersionOverridesEnvironment(t *testing.T) {
+	config := &models.InfrastructureConfig{
+		Client:  "test-client",
+		Company: "gcl",
+		Region:  "us-east-1",
+		Version: "v1.0.0",
+		Environments: map[string]models.Environment{
+			"dev": {
+				Name:       "Development",
+				AWSAccount: "123456789012",
+				Version:    "v2.0.0",
+				Projects: []interface{}{
+					map[string]interface{}{"core": map[string]interface{}{"version": "1.4.0"}},
+				},
+				Workloads: []interface{}{
+					map[string]interface{}{"api": map[string]interface{}{"version": "1.5.0"}},
+				},
+			},
+		},
+	}
+	generator := &ProjectGenerator{config: config}
+
+	project := generator.buildProjectTemplateData("project", config.Environments["dev"].Projects[0], "dev")
+	if project.Version != "1.4.0" {
+		t.Errorf("project version = %q, want 1.4.0", project.Version)
+	}
+
+	workload := generator.buildProjectTemplateData("workload", config.Environments["dev"].Workloads[0], "dev")
+	if workload.Version != "1.5.0" {
+		t.Errorf("workload version = %q, want 1.5.0", workload.Version)
+	}
+
+	inherited := generator.buildProjectTemplateData("project", "other", "dev")
+	if inherited.Version != "v2.0.0" {
+		t.Errorf("inherited version = %q, want environment v2.0.0", inherited.Version)
+	}
+}
+
 func TestBuildProjectTemplateData(t *testing.T) {
 	config := &models.InfrastructureConfig{
 		Client:  "test-client",

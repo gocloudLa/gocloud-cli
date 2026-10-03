@@ -21,7 +21,7 @@ Provisioning CLI: prefer OpenTofu (`tofu`) over Terraform for plan/apply/validat
 
 | Area | Controlled by YAML (then `gocloud generate`) |
 |------|-----------------------------------------------|
-| Standard Platform module pin | `infrastructure.version` (writes `version` in each `main.tf`; optional `source` + `source_ref` for Git modules) |
+| Standard Platform module pin | `infrastructure.version` (writes `version` in each `main.tf`; a project or workload `version` overrides that stack only; optional `source` + `source_ref` for Git modules) |
 | Accounts / envs | `infrastructure.environments.<key>` (+ `layers`, `projects`, `workloads`, optional `region` override) |
 | Domains → metadata | `infrastructure.metadata` → generated `metadata.tf` / `locals.metadata` |
 | State / IAM auth glue | `backend`, `providers` (scopes: global → env → project/workload per CLI docs) |

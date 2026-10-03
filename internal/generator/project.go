@@ -1772,6 +1772,9 @@ func (pg *ProjectGenerator) buildProjectTemplateData(layerType string, item inte
 		envName = envConfig.Name
 		envKey = env
 		envVersion = models.ResolveVersion(envConfig, pg.config.Version)
+		if stackVersion := models.GetItemVersion(item); stackVersion != "" {
+			envVersion = stackVersion
+		}
 	} else {
 		envName = env
 		envKey = env

@@ -81,6 +81,7 @@ type ProjectItem struct {
 	DirName          string                       `json:"dir_name" yaml:"dir_name,omitempty"`
 	EnableTerragrunt *bool                        `json:"enable_terragrunt" yaml:"enable_terragrunt,omitempty"`
 	DependsOn        []string                     `json:"depends_on" yaml:"depends_on,omitempty"`
+	Version          string                       `json:"version" yaml:"version,omitempty"`
 	Providers        *ProviderConfig              `json:"providers" yaml:"providers,omitempty"`
 	Backend          *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`
 	Secrets          *SecretsConfig               `json:"secrets" yaml:"secrets,omitempty"`
@@ -94,6 +95,7 @@ type WorkloadItem struct {
 	EnableSecrets    *bool    `json:"enable_secrets" yaml:"enable_secrets,omitempty"`
 	EnableTerragrunt *bool    `json:"enable_terragrunt" yaml:"enable_terragrunt,omitempty"`
 	DependsOn        []string `json:"depends_on" yaml:"depends_on,omitempty"`
+	Version          string   `json:"version" yaml:"version,omitempty"`
 	// New provider and backend configuration
 	Providers *ProviderConfig              `json:"providers" yaml:"providers,omitempty"`
 	Backend   *BackendInfrastructureConfig `json:"backend" yaml:"backend,omitempty"`
@@ -785,12 +787,52 @@ func resolveRoleName(env Environment, globalSSO *SSOConfig) string {
 	return ""
 }
 
-// ResolveVersion resolves the version with priority: environment > global
+// ResolveVersion resolves the version with priority: environment > global.
+// Project and workload overrides are applied separately via GetItemVersion.
 func ResolveVersion(env Environment, globalVersion string) string {
 	if env.Version != "" {
 		return env.Version
 	}
 	return globalVersion
+}
+
+// GetItemVersion returns a project or workload version override.
+// An empty result means the stack inherits the environment version, then the global one.
+func GetItemVersion(item interface{}) string {
+	switch v := item.(type) {
+	case string, nil:
+		return ""
+	case ProjectItem:
+		return strings.TrimSpace(v.Version)
+	case WorkloadItem:
+		return strings.TrimSpace(v.Version)
+	case map[interface{}]interface{}:
+		return GetItemVersion(ToMapStringInterface(v))
+	case map[string]interface{}:
+		if nested := getNestedMap(v); nested != nil {
+			if version := yamlScalarString(nested["version"]); version != "" {
+				return version
+			}
+		}
+		return yamlScalarString(v["version"])
+	default:
+		return ""
+	}
+}
+
+func yamlScalarString(v interface{}) string {
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	case int:
+		return strconv.Itoa(t)
+	case int64:
+		return strconv.FormatInt(t, 10)
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	default:
+		return ""
+	}
 }
 
 // ResolveBackendConfig resolves backend configuration with defaults

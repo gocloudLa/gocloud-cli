@@ -193,6 +193,7 @@ infrastructure:
         - blck:                     # Key: "blck"
             name: "Blockchain"      # metadata.tf: project = "Blockchain"
             enable_terragrunt: true # Enable terragrunt for this project
+            # version: "1.0.0"      # This project's main.tf only; otherwise environment, then global
         # Example: Project with terragrunt disabled
         - legacy:                   # Key: "legacy"
             name: "Legacy System"   # metadata.tf: project = "Legacy System"
@@ -203,6 +204,7 @@ infrastructure:
         - blck:                     # Key: "blck"
             name: "Blockchain"      # metadata.tf: project = "Blockchain"
             enable_terragrunt: true # Enable terragrunt for this workload
+            # version: "1.2.0"      # This workload's main.tf only; otherwise environment, then global
     
     prd:
       name: "Production"

@@ -816,6 +816,60 @@ func TestCalculateDependencies_WorkloadDependsOnEmpty(t *testing.T) {
 	}
 }
 
+func TestGetItemVersion(t *testing.T) {
+	tests := []struct {
+		name     string
+		item     interface{}
+		expected string
+	}{
+		{
+			name:     "string project has no version",
+			item:     "core",
+			expected: "",
+		},
+		{
+			name:     "project struct",
+			item:     ProjectItem{Key: "core", Version: "1.0.0"},
+			expected: "1.0.0",
+		},
+		{
+			name:     "workload struct",
+			item:     WorkloadItem{Key: "api", Version: "1.2.0"},
+			expected: "1.2.0",
+		},
+		{
+			name:     "nested project map",
+			item:     map[string]interface{}{"core": map[string]interface{}{"version": "1.0.0"}},
+			expected: "1.0.0",
+		},
+		{
+			name: "yaml interface map",
+			item: map[interface{}]interface{}{
+				"api": map[interface{}]interface{}{"version": "2.0.0"},
+			},
+			expected: "2.0.0",
+		},
+		{
+			name:     "direct map",
+			item:     map[string]interface{}{"name": "Core", "version": "3.0.0"},
+			expected: "3.0.0",
+		},
+		{
+			name:     "missing version",
+			item:     map[string]interface{}{"core": map[string]interface{}{"name": "Core"}},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetItemVersion(tt.item); got != tt.expected {
+				t.Errorf("GetItemVersion() = %q, expected %q", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestResolveVersion(t *testing.T) {
 	tests := []struct {
 		name          string

@@ -642,13 +642,14 @@ infrastructure:
 
 **Default behavior:**
 - Global `infrastructure.version` applies to all generated layers.
-- Environment `version` overrides only that environment's `main.tf`.
+- Environment `version` overrides `main.tf` for that environment, including stacks that do not set their own.
+- Project and workload `version` override only that stack's `main.tf`. Every `version` line in that file receives the same value.
 
 **Override scope:**
 
 | Parameter | Global | Environment | Project | Workload |
 |---|:---:|:---:|:---:|:---:|
-| `version` | Y | Y | N | N |
+| `version` | Y | Y | Y | Y |
 
 ```yaml
 infrastructure:
@@ -658,6 +659,12 @@ infrastructure:
       version: "latest"
     prd:
       version: "v2.14.0"
+      projects:
+        - core:
+            version: "1.0.0"
+      workloads:
+        - api:
+            version: "1.2.0"
 ```
 
 ---
